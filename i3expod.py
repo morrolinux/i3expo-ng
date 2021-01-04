@@ -96,17 +96,7 @@ def get_color(section = None, option = None, raw = None):
     #    print traceback.format_exc()
 
 defaults = {
-        ('Capture', 'screenshot_width'): (config.getint, pygame.display.Info().current_w),
-        ('Capture', 'screenshot_height'): (config.getint, pygame.display.Info().current_h),
-        ('Capture', 'screenshot_offset_x'): (config.getint, 0),
-        ('Capture', 'screenshot_offset_y'): (config.getint, 0),
-
-        ('UI', 'window_width'): (config.getint, pygame.display.Info().current_w),
-        ('UI', 'window_height'): (config.getint, pygame.display.Info().current_h),
         ('UI', 'bgcolor'): (get_color, get_color(raw = 'gray20')),
-        ('UI', 'workspaces'): (config.getint, None),
-        ('UI', 'grid_x'): (config.getint, None),
-        ('UI', 'grid_y'): (config.getint, None),
         ('UI', 'padding_percent_x'): (config.getint, 5),
         ('UI', 'padding_percent_y'): (config.getint, 5),
         ('UI', 'spacing_percent_x'): (config.getint, 5),
@@ -234,18 +224,12 @@ def show_ui():
     global global_updates_running
     import math
 
-    window_width = get_config('UI', 'window_width')
-    window_height = get_config('UI', 'window_height')
-    
-    # workspaces = get_config('UI', 'workspaces')
     workspaces = len(global_knowledge["wss"])
 
     # tot_wss_w = sum(w["size"][0] for w in global_knowledge["wss"].values())
     # tot_wss_h = sum(w["size"][1] for w in global_knowledge["wss"].values())
     # print("tot_wss_w:", tot_wss_w, "tot_wss_h:", tot_wss_h)
 
-    grid_x = get_config('UI', 'grid_x')
-    grid_y = get_config('UI', 'grid_y')
     grid_x = grid_y = math.ceil(math.sqrt(workspaces))
     
     padding_x = get_config('UI', 'padding_percent_x')
@@ -321,7 +305,6 @@ def show_ui():
         for x in range(grid_x):
             if wsi >= len(wss_idx):
                 break
-            # index = y * grid_x + x + 1
             index = wss_idx[min(wsi, len(wss_idx)-1)]
             wsi += 1
 
