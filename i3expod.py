@@ -20,7 +20,7 @@ from xdg.BaseDirectory import xdg_config_home
 pp = pprint.PrettyPrinter(indent=4)
 
 global_updates_running = True
-global_knowledge = {'active': 0}
+global_knowledge = {'active': 0, 'wss': {}}
 
 pygame.display.init()
 pygame.font.init()
@@ -45,7 +45,7 @@ def signal_show(signal, frame):
     if not global_updates_running:
         global_updates_running = True
     else:
-        i3.command('workspace i3expod-temporary-workspace')
+        # i3.command('workspace i3expod-temporary-workspace')
         global_updates_running = False
         ui_thread = Thread(target = show_ui)
         ui_thread.daemon = True
@@ -151,34 +151,32 @@ def isset(option):
     except ValueError:
         return False
 
-def grab_screen():
-    x1 = get_config('Capture','screenshot_offset_x')
-    y1 = get_config('Capture','screenshot_offset_y')
-    x2 = get_config('Capture','screenshot_width')
-    y2 = get_config('Capture','screenshot_height')
-    w, h = x2-x1, y2-y1
+def grab_screen(x=None, y=None, w=None, h=None):
     size = w * h
     objlength = size * 3
 
     grab.getScreen.argtypes = []
     result = (ctypes.c_ubyte*objlength)()
 
-    grab.getScreen(x1,y1, w, h, result)
+    grab.getScreen(x, y, w, h, result)
     pil = Image.frombuffer('RGB', (w, h), result, 'raw', 'RGB', 0, 1)
     #draw = ImageDraw.Draw(pil)
     #draw.text((100,100), 'abcde')
     return pygame.image.fromstring(pil.tobytes(), pil.size, pil.mode)
 
-def update_workspace(workspace):
-    if workspace.num not in global_knowledge.keys():
-        global_knowledge[workspace.num] = {
+def update_workspace(workspace, screenshot=None):
+    if workspace.num not in global_knowledge["wss"].keys():
+        global_knowledge["wss"][workspace.num] = {
                 'name': None,
                 'screenshot': None,
-                'windows': {}
+                'windows': {},
+                'size': (1920, 1080)
         }
 
-    global_knowledge[workspace.num]['name'] = workspace.name
-
+    if screenshot is not None:
+        global_knowledge["wss"][workspace.num]['size'] = (screenshot.get_width(), screenshot.get_height())
+    global_knowledge["wss"][workspace.num]['name'] = workspace.name
+    global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     global_knowledge['active'] = workspace.num
 
 def init_knowledge():
@@ -198,22 +196,29 @@ def update_state(i3, e):
     last_update = time.time()
 
     root = i3.get_tree()
+    window = root.find_focused()
+    current_workspace = window.workspace()
+
+    # remove leftover desktops
+    i3_active_wss = root.workspaces()
     deleted = []
-    for num in global_knowledge.keys():
-        if type(num) is int and num not in [w.num for w in root.workspaces()]:
-            deleted += [num]
+    for num in global_knowledge["wss"].keys():
+        if num not in [w.num for w in i3_active_wss]:
+            deleted.append([num])
+    deleted.sort() # make sure we're deleting the right items while iterating
+    deleted.reverse()
     for num in deleted:
-        del(global_knowledge[num])
+        del(global_knowledge["wss"][num])
 
-    current_workspace = root.find_focused().workspace()
-    update_workspace(current_workspace)
+    workspace_width = current_workspace.rect.width
+    workspace_height = current_workspace.rect.height
+    workspace_x = current_workspace.rect.x
+    workspace_y = current_workspace.rect.y
 
-    screenshot = grab_screen()
+    screenshot = grab_screen(x=workspace_x, y=workspace_y, w=workspace_width, h=workspace_height)
 
+    update_workspace(current_workspace, screenshot)
     #time.sleep(0.5)
-
-    if current_workspace.num == i3ipc.Connection().get_tree().find_focused().workspace().num:
-        global_knowledge[current_workspace.num]['screenshot'] = screenshot
 
 
 def get_hovered_frame(mpos, frames):
@@ -231,15 +236,24 @@ def show_ui():
     window_width = get_config('UI', 'window_width')
     window_height = get_config('UI', 'window_height')
     
-    workspaces = get_config('UI', 'workspaces')
+    # workspaces = get_config('UI', 'workspaces')
+    workspaces = len(global_knowledge["wss"])
+    print(global_knowledge["wss"])
+
+    # tot_wss_w = sum(w["size"][0] for w in global_knowledge["wss"].values())
+    # tot_wss_h = sum(w["size"][1] for w in global_knowledge["wss"].values())
+    # print("tot_wss_w:", tot_wss_w, "tot_wss_h:", tot_wss_h)
+
     grid_x = get_config('UI', 'grid_x')
     grid_y = get_config('UI', 'grid_y')
+    print("x:", grid_x, " y:", grid_y)
     
     padding_x = get_config('UI', 'padding_percent_x')
     padding_y = get_config('UI', 'padding_percent_y')
     spacing_x = get_config('UI', 'spacing_percent_x')
     spacing_y = get_config('UI', 'spacing_percent_y')
     frame_width = get_config('UI', 'frame_width_px')
+    print("frame_width:", frame_width)
     
     frame_active_color = get_config('UI', 'frame_active_color')
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
@@ -263,17 +277,20 @@ def show_ui():
 
     switch_to_empty_workspaces = get_config('UI', 'switch_to_empty_workspaces')
 
-    screen = pygame.display.set_mode((window_width, window_height), pygame.RESIZABLE)
-    pygame.display.set_caption('i3expo')
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+
+    pygame.display.set_caption('i3expo-ng')
 
     total_x = screen.get_width()
     total_y = screen.get_height()
 
     pad_x = round(total_x * padding_x / 100)
     pad_y = round(total_y * padding_y / 100)
+    print("pad_x:", pad_x, "pad_y:", pad_y)
 
     space_x = round(total_x * spacing_x / 100)
     space_y = round(total_y * spacing_y / 100)
+    print("space_x:", space_x, "space_y:", space_y)
 
     shot_outer_x = round((total_x - 2 * pad_x - space_x * (grid_x - 1)) / grid_x)
     shot_outer_y = round((total_y - 2 * pad_y - space_y * (grid_y - 1)) / grid_y)
@@ -314,12 +331,13 @@ def show_ui():
             if global_knowledge['active'] == index:
                 tile_color = tile_active_color
                 frame_color = frame_active_color
-                image = global_knowledge[index]['screenshot']
-            elif index in global_knowledge.keys() and global_knowledge[index]['screenshot']:
+                image = global_knowledge["wss"][index]['screenshot']
+            elif index in global_knowledge["wss"].keys() and\
+                 global_knowledge["wss"][index]['screenshot']:
                 tile_color = tile_inactive_color
                 frame_color = frame_inactive_color
-                image = global_knowledge[index]['screenshot']
-            elif index in global_knowledge.keys():
+                image = global_knowledge["wss"][index]['screenshot']
+            elif index in global_knowledge["wss"].keys():
                 tile_color = tile_unknown_color
                 frame_color = frame_unknown_color
                 image = missing
@@ -394,9 +412,9 @@ def show_ui():
             except:
                 pass
 
-            if names_show and (index in global_knowledge.keys() or defined_name):
+            if names_show and (index in global_knowledge["wss"].keys() or defined_name):
                 if not defined_name:
-                    name = global_knowledge[index]['name']
+                    name = global_knowledge["wss"][index]['name']
                 else:
                     name = defined_name
                 name = font.render(name, True, names_color)
@@ -409,6 +427,10 @@ def show_ui():
 
     running = True
     use_mouse = True
+
+    active_frame = None
+    last_active_frame = 1
+
     while running and not global_updates_running and pygame.display.get_init():
         jump = False
         kbdmove = (0, 0)
@@ -442,9 +464,12 @@ def show_ui():
                 pygame.event.clear()
                 break
 
+
         if use_mouse:
             mpos = pygame.mouse.get_pos()
-            active_frame = get_hovered_frame(mpos, frames)
+            af = get_hovered_frame(mpos, frames)
+            active_frame = af if af is not None else last_active_frame
+            last_active_frame = active_frame
         elif kbdmove != (0, 0):
             if active_frame == None:
                 active_frame = 1
@@ -458,9 +483,10 @@ def show_ui():
                 active_frame += workspaces
             print(active_frame)
 
+
         if jump:
-            if active_frame in global_knowledge.keys():
-                i3.command('workspace ' + str(global_knowledge[active_frame]['name']))
+            if active_frame in global_knowledge["wss"].keys():
+                i3.command('workspace ' + str(global_knowledge["wss"][active_frame]['name']))
                 break
             if switch_to_empty_workspaces:
                 defined_name = False
