@@ -204,7 +204,7 @@ def update_state(i3, e):
     deleted = []
     for num in global_knowledge["wss"].keys():
         if num not in [w.num for w in i3_active_wss]:
-            deleted.append([num])
+            deleted.append(num)
     deleted.sort() # make sure we're deleting the right items while iterating
     deleted.reverse()
     for num in deleted:
@@ -232,13 +232,13 @@ def get_hovered_frame(mpos, frames):
 
 def show_ui():
     global global_updates_running
+    import math
 
     window_width = get_config('UI', 'window_width')
     window_height = get_config('UI', 'window_height')
     
     # workspaces = get_config('UI', 'workspaces')
     workspaces = len(global_knowledge["wss"])
-    print(global_knowledge["wss"])
 
     # tot_wss_w = sum(w["size"][0] for w in global_knowledge["wss"].values())
     # tot_wss_h = sum(w["size"][1] for w in global_knowledge["wss"].values())
@@ -246,14 +246,13 @@ def show_ui():
 
     grid_x = get_config('UI', 'grid_x')
     grid_y = get_config('UI', 'grid_y')
-    print("x:", grid_x, " y:", grid_y)
+    grid_x = grid_y = math.ceil(math.sqrt(workspaces))
     
     padding_x = get_config('UI', 'padding_percent_x')
     padding_y = get_config('UI', 'padding_percent_y')
     spacing_x = get_config('UI', 'spacing_percent_x')
     spacing_y = get_config('UI', 'spacing_percent_y')
     frame_width = get_config('UI', 'frame_width_px')
-    print("frame_width:", frame_width)
     
     frame_active_color = get_config('UI', 'frame_active_color')
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
@@ -286,11 +285,11 @@ def show_ui():
 
     pad_x = round(total_x * padding_x / 100)
     pad_y = round(total_y * padding_y / 100)
-    print("pad_x:", pad_x, "pad_y:", pad_y)
+    # print("pad_x:", pad_x, "pad_y:", pad_y)
 
     space_x = round(total_x * spacing_x / 100)
     space_y = round(total_y * spacing_y / 100)
-    print("space_x:", space_x, "space_y:", space_y)
+    # print("space_x:", space_x, "space_y:", space_y)
 
     shot_outer_x = round((total_x - 2 * pad_x - space_x * (grid_x - 1)) / grid_x)
     shot_outer_y = round((total_y - 2 * pad_y - space_y * (grid_y - 1)) / grid_y)
@@ -315,10 +314,16 @@ def show_ui():
 
     font = pygame.font.SysFont(names_font, names_fontsize)
 
+    wss_idx = [int(k) for k in global_knowledge["wss"].keys()]
+    wsi = 0
+
     for y in range(grid_y):
         for x in range(grid_x):
-
-            index = y * grid_x + x + 1
+            if wsi >= len(wss_idx):
+                break
+            # index = y * grid_x + x + 1
+            index = wss_idx[min(wsi, len(wss_idx)-1)]
+            wsi += 1
 
             frames[index] = {
                     'active': False,
