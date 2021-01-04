@@ -299,13 +299,20 @@ def show_ui():
     font = pygame.font.SysFont(names_font, names_fontsize)
 
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()]
+    wss_idx.sort()
     wsi = 0
+
+    # desktop index matrix for keyboard navigation
+    kbd_grid = [-1 for _ in range(grid_y)]
+    for i in range(len(kbd_grid)):
+        kbd_grid[i] = [-1 for _ in range(grid_x)]
 
     for y in range(grid_y):
         for x in range(grid_x):
             if wsi >= len(wss_idx):
                 break
-            index = wss_idx[min(wsi, len(wss_idx)-1)]
+            index = wss_idx[wsi]
+            kbd_grid[y][x] = index
             wsi += 1
 
             frames[index] = {
@@ -419,6 +426,10 @@ def show_ui():
     active_frame = None
     last_active_frame = 1
 
+    col_idx = 0
+    row_idx = 0
+    print("kbd_grid:", kbd_grid)
+
     while running and not global_updates_running and pygame.display.get_init():
         jump = False
         kbdmove = (0, 0)
@@ -460,16 +471,25 @@ def show_ui():
             last_active_frame = active_frame
         elif kbdmove != (0, 0):
             if active_frame == None:
-                active_frame = 1
+                active_frame = kbd_grid[row_idx][col_idx]
+
             if kbdmove[0] != 0:
-                active_frame += kbdmove[0]
+                tmp = col_idx + kbdmove[0]
+                col_idx = tmp if tmp < len(kbd_grid[0]) else col_idx
+                col_idx = 0 if col_idx < 0 else col_idx
             elif kbdmove[1] != 0:
-                active_frame += kbdmove[1] * grid_x
-            if active_frame > workspaces:
-                active_frame -= workspaces
-            elif active_frame < 0:
-                active_frame += workspaces
-            print(active_frame)
+                tmp = row_idx + kbdmove[1]
+                row_idx = tmp if tmp < len(kbd_grid) else row_idx
+                row_idx = 0 if row_idx < 0 else row_idx
+
+            active_frame = kbd_grid[row_idx][col_idx]
+
+            if active_frame < 0:
+                row_idx = col_idx = 0
+                active_frame = kbd_grid[row_idx][col_idx]
+                last_active_frame = active_frame
+
+            last_active_frame = active_frame
 
 
         if jump:
