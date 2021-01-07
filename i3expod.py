@@ -160,12 +160,14 @@ def update_workspace(workspace, screenshot=None):
                 'name': None,
                 'screenshot': None,
                 'windows': {},
-                'size': (1920, 1080)
+                'size': (1920, 1080),
+                'output': ""
         }
 
     if screenshot is not None:
         global_knowledge["wss"][workspace.num]['size'] = (screenshot.get_width(), screenshot.get_height())
     global_knowledge["wss"][workspace.num]['name'] = workspace.name
+    global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
     global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     global_knowledge['active'] = workspace.num
 
@@ -244,8 +246,10 @@ def show_ui():
     frame_empty_color = get_config('UI', 'frame_empty_color')
     frame_nonexistant_color = get_config('UI', 'frame_nonexistant_color')
     
-    tile_active_color = get_config('UI', 'tile_active_color')
-    tile_inactive_color = get_config('UI', 'tile_inactive_color')
+    # tile_active_color = get_config('UI', 'tile_active_color')
+    # tile_inactive_color = get_config('UI', 'tile_inactive_color')
+    tile_active_color = get_config('UI', 'bgcolor')
+    tile_inactive_color = get_config('UI', 'bgcolor')
     tile_unknown_color = get_config('UI', 'tile_unknown_color')
     tile_empty_color = get_config('UI', 'tile_empty_color')
     tile_nonexistant_color = get_config('UI', 'tile_nonexistant_color')
@@ -412,6 +416,7 @@ def show_ui():
                     name = global_knowledge["wss"][index]['name']
                 else:
                     name = defined_name
+                name += " (" + global_knowledge["wss"][index]['output'] + ")"
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
                 name_x = origin_x + round((shot_outer_x - name_width) / 2)
@@ -428,7 +433,6 @@ def show_ui():
 
     col_idx = 0
     row_idx = 0
-    print("kbd_grid:", kbd_grid)
 
     while running and not global_updates_running and pygame.display.get_init():
         jump = False
