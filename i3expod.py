@@ -12,10 +12,15 @@ import sys
 import traceback
 import pprint
 import time
+import argparse
 from threading import Thread
 from PIL import Image, ImageDraw
-
 from xdg.BaseDirectory import xdg_config_home
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--fullscreen", action="store_true",
+                    help="run in fullscreen")
+args = parser.parse_args()
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -45,8 +50,20 @@ def signal_show(signal, frame):
     if not global_updates_running:
         global_updates_running = True
     else:
-        # i3.command('workspace i3expod-temporary-workspace')
+        focused_win = i3.get_tree().find_focused()
+        win_w = focused_win.rect.width
+        win_h = focused_win.rect.height
+        win_x = focused_win.rect.x
+        win_y = focused_win.rect.y
+        win_name = focused_win.name
+        win_id = focused_win.id
+        screenshot = grab_screen(x=win_x, y=win_y, w=win_w, h=win_h)
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot'] = screenshot
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_name'] = win_name
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = win_id
+
         global_updates_running = False
+        i3.command('workspace i3expod-temporary-workspace')
         ui_thread = Thread(target = show_ui)
         ui_thread.daemon = True
         ui_thread.start()
@@ -222,6 +239,7 @@ def get_hovered_frame(mpos, frames):
             return frame
     return None
 
+
 def show_ui():
     global global_updates_running
     import math
@@ -264,7 +282,14 @@ def show_ui():
 
     switch_to_empty_workspaces = get_config('UI', 'switch_to_empty_workspaces')
 
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
+
+    flags = pygame.RESIZABLE
+    if args.fullscreen:
+        flags = pygame.FULLSCREEN
+    
+    screen = pygame.display.set_mode((monitor_size[0], monitor_size[1]), flags)
+    screen.set_alpha(None)
 
     pygame.display.set_caption('i3expo-ng')
 
@@ -288,7 +313,6 @@ def show_ui():
     offset_delta_x = shot_outer_x + space_x
     offset_delta_y = shot_outer_y + space_y
 
-    screen.fill(get_config('UI', 'bgcolor'))
     
     missing = pygame.Surface((150,200), pygame.SRCALPHA, 32) 
     missing = missing.convert_alpha()
@@ -304,124 +328,131 @@ def show_ui():
 
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()]
     wss_idx.sort()
-    wsi = 0
 
     # desktop index matrix for keyboard navigation
     kbd_grid = [-1 for _ in range(grid_y)]
     for i in range(len(kbd_grid)):
         kbd_grid[i] = [-1 for _ in range(grid_x)]
 
-    for y in range(grid_y):
-        for x in range(grid_x):
-            if wsi >= len(wss_idx):
-                break
-            index = wss_idx[wsi]
-            kbd_grid[y][x] = index
-            wsi += 1
+    def draw_grid():
+        wsi = 0
+        screen.fill(get_config('UI', 'bgcolor'))
+        for y in range(grid_y):
+            for x in range(grid_x):
+                if wsi >= len(wss_idx):
+                    break
+                index = wss_idx[wsi]
+                kbd_grid[y][x] = index
+                wsi += 1
 
-            frames[index] = {
-                    'active': False,
-                    'mouseoff': None,
-                    'mouseon': None,
-                    'ul': (None, None),
-                    'br': (None, None)
-            }
+                frames[index] = {
+                        'active': False,
+                        'mouseoff': None,
+                        'mouseon': None,
+                        'mouseondrag': None,
+                        'ul': (None, None),
+                        'br': (None, None)
+                }
 
-            if global_knowledge['active'] == index:
-                tile_color = tile_active_color
-                frame_color = frame_active_color
-                image = global_knowledge["wss"][index]['screenshot']
-            elif index in global_knowledge["wss"].keys() and\
-                 global_knowledge["wss"][index]['screenshot']:
-                tile_color = tile_inactive_color
-                frame_color = frame_inactive_color
-                image = global_knowledge["wss"][index]['screenshot']
-            elif index in global_knowledge["wss"].keys():
-                tile_color = tile_unknown_color
-                frame_color = frame_unknown_color
-                image = missing
-            elif index <= workspaces:
-                tile_color = tile_empty_color
-                frame_color = frame_empty_color
-                image = None
-            else:
-                tile_color = tile_nonexistant_color
-                frame_color = frame_nonexistant_color
-                image = None
-
-            origin_x = pad_x + offset_delta_x * x
-            origin_y = pad_y + offset_delta_y * y
-
-            frames[index]['ul'] = (origin_x, origin_y)
-            frames[index]['br'] = (origin_x + shot_outer_x, origin_y + shot_outer_y)
-
-            screen.fill(frame_color,
-                    (
-                        origin_x,
-                        origin_y,
-                        shot_outer_x,
-                        shot_outer_y,
-                    ))
-
-            screen.fill(tile_color,
-                    (
-                        origin_x + frame_width,
-                        origin_y + frame_width,
-                        shot_inner_x,
-                        shot_inner_y,
-                    ))
-
-            if image:
-                if thumb_stretch:
-                    image = pygame.transform.smoothscale(image, (shot_inner_x, shot_inner_y))
-                    offset_x = 0
-                    offset_y = 0
+                if global_knowledge['active'] == index:
+                    tile_color = tile_active_color
+                    frame_color = frame_active_color
+                    image = global_knowledge["wss"][index]['screenshot']
+                elif index in global_knowledge["wss"].keys() and\
+                     global_knowledge["wss"][index]['screenshot']:
+                    tile_color = tile_inactive_color
+                    frame_color = frame_inactive_color
+                    image = global_knowledge["wss"][index]['screenshot']
+                elif index in global_knowledge["wss"].keys():
+                    tile_color = tile_unknown_color
+                    frame_color = frame_unknown_color
+                    image = missing
+                elif index <= workspaces:
+                    tile_color = tile_empty_color
+                    frame_color = frame_empty_color
+                    image = None
                 else:
-                    image_size = image.get_rect().size
-                    image_x = image_size[0]
-                    image_y = image_size[1]
-                    ratio_x = shot_inner_x / image_x
-                    ratio_y = shot_inner_y / image_y
-                    if ratio_x < ratio_y:
-                        result_x = shot_inner_x
-                        result_y = round(ratio_x * image_y)
+                    tile_color = tile_nonexistant_color
+                    frame_color = frame_nonexistant_color
+                    image = None
+
+                origin_x = pad_x + offset_delta_x * x
+                origin_y = pad_y + offset_delta_y * y
+
+                frames[index]['ul'] = (origin_x, origin_y)
+                frames[index]['br'] = (origin_x + shot_outer_x, origin_y + shot_outer_y)
+
+                screen.fill(frame_color,
+                        (
+                            origin_x,
+                            origin_y,
+                            shot_outer_x,
+                            shot_outer_y,
+                        ))
+
+                screen.fill(tile_color,
+                        (
+                            origin_x + frame_width,
+                            origin_y + frame_width,
+                            shot_inner_x,
+                            shot_inner_y,
+                        ))
+
+                if image:
+                    if thumb_stretch:
+                        image = pygame.transform.smoothscale(image, (shot_inner_x, shot_inner_y))
                         offset_x = 0
-                        offset_y = round((shot_inner_y - result_y) / 2)
-                    else:
-                        result_x = round(ratio_y * image_x)
-                        result_y = shot_inner_y
-                        offset_x = round((shot_inner_x - result_x) / 2)
                         offset_y = 0
-                    image = pygame.transform.smoothscale(image, (result_x, result_y))
-                screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
+                    else:
+                        image_size = image.get_rect().size
+                        image_x = image_size[0]
+                        image_y = image_size[1]
+                        ratio_x = shot_inner_x / image_x
+                        ratio_y = shot_inner_y / image_y
+                        if ratio_x < ratio_y:
+                            result_x = shot_inner_x
+                            result_y = round(ratio_x * image_y)
+                            offset_x = 0
+                            offset_y = round((shot_inner_y - result_y) / 2)
+                        else:
+                            result_x = round(ratio_y * image_x)
+                            result_y = shot_inner_y
+                            offset_x = round((shot_inner_x - result_x) / 2)
+                            offset_y = 0
+                        image = pygame.transform.smoothscale(image, (result_x, result_y))
+                    screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
 
-            mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
-            lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
-            lightmask.convert_alpha()
-            lightmask.fill((255,255,255,255 * highlight_percentage / 100))
-            mouseon = mouseoff.copy()
-            mouseon.blit(lightmask, (0, 0))
+                mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
+                lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
+                lightmask.convert_alpha()
+                lightmask_drag = lightmask.copy()
+                lightmask.fill((255,255,255,255 * highlight_percentage / 100))
+                lightmask_drag.fill((128,128,255,255 * highlight_percentage / 100))
+                mouseon = mouseoff.copy()
+                mouseondrag = mouseoff.copy()
+                mouseon.blit(lightmask, (0, 0))
+                mouseondrag.blit(lightmask_drag, (0, 0))
+                frames[index]['mouseon'] = mouseon.copy()
+                frames[index]['mouseondrag'] = mouseondrag.copy()
+                frames[index]['mouseoff'] = mouseoff.copy()
 
-            frames[index]['mouseon'] = mouseon.copy()
-            frames[index]['mouseoff'] = mouseoff.copy()
+                defined_name = False
+                try:
+                    defined_name = config.get('Workspaces', 'workspace_' + str(index))
+                except:
+                    pass
 
-            defined_name = False
-            try:
-                defined_name = config.get('Workspaces', 'workspace_' + str(index))
-            except:
-                pass
-
-            if names_show and (index in global_knowledge["wss"].keys() or defined_name):
-                if not defined_name:
-                    name = global_knowledge["wss"][index]['name']
-                else:
-                    name = defined_name
-                name += " (" + global_knowledge["wss"][index]['output'] + ")"
-                name = font.render(name, True, names_color)
-                name_width = name.get_rect().size[0]
-                name_x = origin_x + round((shot_outer_x - name_width) / 2)
-                name_y = origin_y + shot_outer_y + round(shot_outer_y * 0.02)
-                screen.blit(name, (name_x, name_y))
+                if names_show and (index in global_knowledge["wss"].keys() or defined_name):
+                    if not defined_name:
+                        name = global_knowledge["wss"][index]['name']
+                    else:
+                        name = defined_name
+                    name += " (" + global_knowledge["wss"][index]['output'] + ")"
+                    name = font.render(name, True, names_color)
+                    name_width = name.get_rect().size[0]
+                    name_x = origin_x + round((shot_outer_x - name_width) / 2)
+                    name_y = origin_y + shot_outer_y + round(shot_outer_y * 0.02)
+                    screen.blit(name, (name_x, name_y))
 
     pygame.display.flip()
 
@@ -434,17 +465,35 @@ def show_ui():
     col_idx = 0
     row_idx = 0
 
+    screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
+    rw = int(screenshot.get_width()/4)
+    rh = int(screenshot.get_height()/4)
+    rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
+    image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
+    focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
+    focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
+    RED = (255, 0, 0)
+    FPS = 30
+    rectangle_dragging = False
+    clock = pygame.time.Clock()
+
     while running and not global_updates_running and pygame.display.get_init():
+        draw_grid()
+
         jump = False
+        move_win = False
         kbdmove = (0, 0)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEMOTION:
                 use_mouse = True
+                if rectangle_dragging:
+                    mouse_x, mouse_y = event.pos
+                    rectangle.x = mouse_x + offset_x
+                    rectangle.y = mouse_y + offset_y
             elif event.type == pygame.KEYDOWN:
                 use_mouse = False
-
                 if event.key == pygame.K_UP or event.key == pygame.K_k:
                     kbdmove = (0, -1)
                 if event.key == pygame.K_DOWN or event.key == pygame.K_j:
@@ -463,10 +512,20 @@ def show_ui():
             elif event.type == pygame.MOUSEBUTTONUP:
                 use_mouse = True
                 if event.button == 1:
-                    jump = True
+                    if rectangle_dragging:
+                        move_win = True
+                    jump = True # if not rectangle_dragging else False
+                    rectangle_dragging = False
                 pygame.event.clear()
                 break
 
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    if rectangle.collidepoint(event.pos):
+                        rectangle_dragging = True
+                        mouse_x, mouse_y = event.pos
+                        offset_x = rectangle.x - mouse_x
+                        offset_y = rectangle.y - mouse_y
 
         if use_mouse:
             mpos = pygame.mouse.get_pos()
@@ -495,6 +554,9 @@ def show_ui():
 
             last_active_frame = active_frame
 
+        if move_win:
+            cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
+            i3.command(cmd)
 
         if jump:
             if active_frame in global_knowledge["wss"].keys():
@@ -516,14 +578,22 @@ def show_ui():
                 frames[frame]['active'] = False
         if active_frame and not frames[active_frame]['active']:
             screen.blit(frames[active_frame]['mouseon'], frames[active_frame]['ul'])
+            if rectangle_dragging:
+                screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
             frames[active_frame]['active'] = True
 
+        screen.blit(image, rectangle)
+
         pygame.display.update()
-        pygame.time.wait(25)
+        # pygame.time.wait(25)
+        clock.tick(FPS)
+
 
     pygame.display.quit()
     pygame.display.init()
     global_updates_running = True
+    if not jump:
+        i3.command('workspace ' + str(global_knowledge["active"]))
 
 if __name__ == '__main__':
 
