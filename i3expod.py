@@ -136,7 +136,6 @@ defaults = {
         ('UI', 'names_font'): (config.get, 'sans-serif'),
         ('UI', 'names_fontsize'): (config.getint, 25),
         ('UI', 'names_color'): (get_color, get_color(raw = 'white')),
-        ('UI', 'thumb_stretch'): (config.getboolean, 'False'),
         ('UI', 'highlight_percentage'): (config.getint, 20),
 }
 
@@ -279,7 +278,6 @@ def show_ui():
     names_fontsize = get_config('UI', 'names_fontsize')
     names_color = get_config('UI', 'names_color')
 
-    thumb_stretch = get_config('UI', 'thumb_stretch')
     highlight_percentage = get_config('UI', 'highlight_percentage')
 
     monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
@@ -345,6 +343,14 @@ def show_ui():
     kbd_grid = [-1 for _ in range(grid_y)]
     for i in range(len(kbd_grid)):
         kbd_grid[i] = [-1 for _ in range(grid_x)]
+        
+    cache = {i: None for i in wss_idx}
+    frames = {i: {'active': False, 
+                'mouseoff': None, 
+                'mouseon': None, 
+                'mouseondrag': None, 
+                'ul': (None, None), 
+                'br': (None, None)} for i in wss_idx}
 
     def draw_grid():
         wsi = 0
@@ -356,15 +362,6 @@ def show_ui():
                 index = wss_idx[wsi]
                 kbd_grid[y][x] = index
                 wsi += 1
-
-                frames[index] = {
-                        'active': False,
-                        'mouseoff': None,
-                        'mouseon': None,
-                        'mouseondrag': None,
-                        'ul': (None, None),
-                        'br': (None, None)
-                }
 
                 if global_knowledge['active'] == index:
                     tile_color = tile_active_color
@@ -411,43 +408,44 @@ def show_ui():
                         ))
 
                 if image:
-                    if thumb_stretch:
-                        image = pygame.transform.smoothscale(image, (shot_inner_x, shot_inner_y))
+                    image_size = image.get_rect().size
+                    image_x = image_size[0]
+                    image_y = image_size[1]
+                    ratio_x = shot_inner_x / image_x
+                    ratio_y = shot_inner_y / image_y
+                    if ratio_x < ratio_y:
+                        result_x = shot_inner_x
+                        result_y = round(ratio_x * image_y)
                         offset_x = 0
-                        offset_y = 0
+                        offset_y = round((shot_inner_y - result_y) / 2)
                     else:
-                        image_size = image.get_rect().size
-                        image_x = image_size[0]
-                        image_y = image_size[1]
-                        ratio_x = shot_inner_x / image_x
-                        ratio_y = shot_inner_y / image_y
-                        if ratio_x < ratio_y:
-                            result_x = shot_inner_x
-                            result_y = round(ratio_x * image_y)
-                            offset_x = 0
-                            offset_y = round((shot_inner_y - result_y) / 2)
-                        else:
-                            result_x = round(ratio_y * image_x)
-                            result_y = shot_inner_y
-                            offset_x = round((shot_inner_x - result_x) / 2)
-                            offset_y = 0
-                        image = pygame.transform.smoothscale(image, (result_x, result_y))
-                    if image is not None:
-                        screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
+                        result_x = round(ratio_y * image_x)
+                        result_y = shot_inner_y
+                        offset_x = round((shot_inner_x - result_x) / 2)
+                        offset_y = 0
 
-                mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
-                lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
-                lightmask.convert_alpha()
-                lightmask_drag = lightmask.copy()
-                lightmask.fill((255,255,255,255 * highlight_percentage / 100))
-                lightmask_drag.fill((128,128,255,255 * highlight_percentage / 100))
-                mouseon = mouseoff.copy()
-                mouseondrag = mouseoff.copy()
-                mouseon.blit(lightmask, (0, 0))
-                mouseondrag.blit(lightmask_drag, (0, 0))
-                frames[index]['mouseon'] = mouseon.copy()
-                frames[index]['mouseondrag'] = mouseondrag.copy()
-                frames[index]['mouseoff'] = mouseoff.copy()
+                    if cache[index] is not None:
+                        image = cache[index]
+                    else:
+                        image = pygame.transform.smoothscale(image, (result_x, result_y))
+                        cache[index] = image
+
+                    screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
+
+                if frames[index]['mouseon'] is None:
+                    mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
+                    lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
+                    lightmask.convert_alpha()
+                    lightmask_drag = lightmask.copy()
+                    lightmask.fill((255,255,255,255 * highlight_percentage / 100))
+                    lightmask_drag.fill((128,128,255,255 * highlight_percentage / 100))
+                    mouseon = mouseoff.copy()
+                    mouseondrag = mouseoff.copy()
+                    mouseon.blit(lightmask, (0, 0))
+                    mouseondrag.blit(lightmask_drag, (0, 0))
+                    frames[index]['mouseon'] = mouseon.copy()
+                    frames[index]['mouseondrag'] = mouseondrag.copy()
+                    frames[index]['mouseoff'] = mouseoff.copy()
 
                 # put the right label (workspace name or output name for the ws to be created on)
                 if index in global_knowledge["wss"].keys():
@@ -478,19 +476,21 @@ def show_ui():
     rw = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][0]/5)
     rh = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][1]/5)
     rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
-    image = None
+    focused_win_image = None
     if screenshot is not None:
-        image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
+        focused_win_image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
     focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
     focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
     RED = (255, 0, 0)
-    FPS = 25
+    FPS = 60
     rectangle_dragging = False
     clock = pygame.time.Clock()
 
-    while running and not global_updates_running and pygame.display.get_init():
-        draw_grid()
+    draw_grid()
 
+    while running and not global_updates_running and pygame.display.get_init():
+        if rectangle_dragging:
+            draw_grid()
         jump = False
         move_win = False
         kbdmove = (0, 0)
@@ -590,15 +590,15 @@ def show_ui():
             frames[active_frame]['active'] = True
 
         # DRAW active window and border
-        win_pad = (rectangle.width * 1) / 100
+        win_pad = max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100)
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
         lightmask.fill((255,255,0,255 * 70 / 100))
 
         screen.blit(lightmask, (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2)))
 
-        if image is not None:
-            screen.blit(image, rectangle)
+        if focused_win_image is not None:
+            screen.blit(focused_win_image, rectangle)
         
         pygame.display.update()
         # pygame.time.wait(25)
