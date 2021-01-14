@@ -582,8 +582,14 @@ def show_ui():
                 screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
             frames[active_frame]['active'] = True
 
+        # DRAW active window and border
+        win_pad = (rectangle.width * 1) / 100
+        lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
+                pygame.SRCALPHA, 32).convert_alpha()
+        lightmask.fill((255,255,0,255 * 70 / 100))
+        screen.blit(lightmask, (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2)))
         screen.blit(image, rectangle)
-
+        
         pygame.display.update()
         # pygame.time.wait(25)
         clock.tick(FPS)
