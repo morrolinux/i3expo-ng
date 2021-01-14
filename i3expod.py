@@ -13,9 +13,11 @@ import traceback
 import pprint
 import time
 import argparse
+import random
 from threading import Thread
 from PIL import Image, ImageDraw
 from xdg.BaseDirectory import xdg_config_home
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
@@ -129,13 +131,11 @@ defaults = {
         ('UI', 'tile_unknown_color'): (get_color, get_color(raw = '#ffe6d0')),
         ('UI', 'tile_empty_color'): (get_color, get_color(raw = 'gray80')),
         ('UI', 'tile_nonexistant_color'): (get_color, get_color(raw = 'gray40')),
-        ('UI', 'names_show'): (config.getboolean, 'True'),
         ('UI', 'names_font'): (config.get, 'sans-serif'),
         ('UI', 'names_fontsize'): (config.getint, 25),
         ('UI', 'names_color'): (get_color, get_color(raw = 'white')),
         ('UI', 'thumb_stretch'): (config.getboolean, 'False'),
         ('UI', 'highlight_percentage'): (config.getint, 20),
-        ('UI', 'switch_to_empty_workspaces'): (config.getboolean, 'False')
 }
 
 def read_config():
@@ -186,12 +186,14 @@ def update_workspace(workspace, screenshot=None):
     global_knowledge["wss"][workspace.num]['name'] = workspace.name
     global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
     global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
-    global_knowledge['active'] = workspace.num
+    global_knowledge["active"] = workspace.num
 
 def init_knowledge():
     root = i3.get_tree()
     for workspace in root.workspaces():
         update_workspace(workspace)
+    # all outputs but the virtual ones
+    global_knowledge["outputs"] = [o for o in i3.get_outputs() if o.name.find('xroot') < 0]
 
 last_update = 0
 
@@ -246,11 +248,8 @@ def show_ui():
 
     workspaces = len(global_knowledge["wss"])
 
-    # tot_wss_w = sum(w["size"][0] for w in global_knowledge["wss"].values())
-    # tot_wss_h = sum(w["size"][1] for w in global_knowledge["wss"].values())
-    # print("tot_wss_w:", tot_wss_w, "tot_wss_h:", tot_wss_h)
-
-    grid_x = grid_y = math.ceil(math.sqrt(workspaces))
+    outputs = global_knowledge["outputs"]
+    grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
     
     padding_x = get_config('UI', 'padding_percent_x')
     padding_y = get_config('UI', 'padding_percent_y')
@@ -272,15 +271,12 @@ def show_ui():
     tile_empty_color = get_config('UI', 'tile_empty_color')
     tile_nonexistant_color = get_config('UI', 'tile_nonexistant_color')
     
-    names_show = get_config('UI', 'names_show')
     names_font = get_config('UI', 'names_font')
     names_fontsize = get_config('UI', 'names_fontsize')
     names_color = get_config('UI', 'names_color')
 
     thumb_stretch = get_config('UI', 'thumb_stretch')
     highlight_percentage = get_config('UI', 'highlight_percentage')
-
-    switch_to_empty_workspaces = get_config('UI', 'switch_to_empty_workspaces')
 
     monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
 
@@ -296,13 +292,13 @@ def show_ui():
     total_x = screen.get_width()
     total_y = screen.get_height()
 
+    # Padding/margin for tiles
     pad_x = round(total_x * padding_x / 100)
     pad_y = round(total_y * padding_y / 100)
-    # print("pad_x:", pad_x, "pad_y:", pad_y)
 
+    # Gap between tiles
     space_x = round(total_x * spacing_x / 100)
     space_y = round(total_y * spacing_y / 100)
-    # print("space_x:", space_x, "space_y:", space_y)
 
     shot_outer_x = round((total_x - 2 * pad_x - space_x * (grid_x - 1)) / grid_x)
     shot_outer_y = round((total_y - 2 * pad_y - space_y * (grid_y - 1)) / grid_y)
@@ -316,17 +312,29 @@ def show_ui():
     
     missing = pygame.Surface((150,200), pygame.SRCALPHA, 32) 
     missing = missing.convert_alpha()
+    neww = missing.copy()
     qm = pygame.font.SysFont('sans-serif', 150).render('?', True, (150, 150, 150))
+    plss = pygame.font.SysFont('sans-serif', 150).render('+', True, (150, 150, 150))
     qm_size = qm.get_rect().size
     origin_x = round((150 - qm_size[0])/2)
     origin_y = round((200 - qm_size[1])/2)
     missing.blit(qm, (origin_x, origin_y))
+    neww.blit(plss, (origin_x, origin_y))
 
     frames = {}
 
     font = pygame.font.SysFont(names_font, names_fontsize)
 
-    wss_idx = [int(k) for k in global_knowledge["wss"].keys()]
+    new_wss = {}
+    wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
+    # generate one new/empty ws for each display output available
+    r = 1000
+    for out in outputs:
+        while r in wss_idx:
+            r += 1
+        wss_idx.append(r)
+        new_wss[r] = out
+        
     wss_idx.sort()
 
     # desktop index matrix for keyboard navigation
@@ -374,7 +382,7 @@ def show_ui():
                 else:
                     tile_color = tile_nonexistant_color
                     frame_color = frame_nonexistant_color
-                    image = None
+                    image = neww
 
                 origin_x = pad_x + offset_delta_x * x
                 origin_y = pad_y + offset_delta_y * y
@@ -436,23 +444,19 @@ def show_ui():
                 frames[index]['mouseondrag'] = mouseondrag.copy()
                 frames[index]['mouseoff'] = mouseoff.copy()
 
-                defined_name = False
-                try:
-                    defined_name = config.get('Workspaces', 'workspace_' + str(index))
-                except:
-                    pass
-
-                if names_show and (index in global_knowledge["wss"].keys() or defined_name):
-                    if not defined_name:
-                        name = global_knowledge["wss"][index]['name']
-                    else:
-                        name = defined_name
+                # put the right label (workspace name or output name for the ws to be created on)
+                if index in global_knowledge["wss"].keys():
+                    name = global_knowledge["wss"][index]['name']
                     name += " (" + global_knowledge["wss"][index]['output'] + ")"
-                    name = font.render(name, True, names_color)
-                    name_width = name.get_rect().size[0]
-                    name_x = origin_x + round((shot_outer_x - name_width) / 2)
-                    name_y = origin_y + shot_outer_y + round(shot_outer_y * 0.02)
-                    screen.blit(name, (name_x, name_y))
+                else:
+                    name = new_wss[index].name
+
+                name = font.render(name, True, names_color)
+                name_width = name.get_rect().size[0]
+                name_x = origin_x + round((shot_outer_x - name_width) / 2)
+                name_y = origin_y + shot_outer_y + round(shot_outer_y * 0.02)
+                screen.blit(name, (name_x, name_y))
+
 
     pygame.display.flip()
 
@@ -466,14 +470,14 @@ def show_ui():
     row_idx = 0
 
     screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
-    rw = int(screenshot.get_width()/4)
-    rh = int(screenshot.get_height()/4)
+    rw = int(screenshot.get_width()/5)
+    rh = int(screenshot.get_height()/5)
     rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
     image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
     focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
     focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
     RED = (255, 0, 0)
-    FPS = 30
+    FPS = 25
     rectangle_dragging = False
     clock = pygame.time.Clock()
 
@@ -556,21 +560,17 @@ def show_ui():
 
         if move_win:
             cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
+            # if active_frame not in global_knowledge["wss"].keys():
+            #     cmd += ';[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + new_wss[active_frame].name
             i3.command(cmd)
 
         if jump:
-            if active_frame in global_knowledge["wss"].keys():
-                i3.command('workspace ' + str(global_knowledge["wss"][active_frame]['name']))
-                break
-            if switch_to_empty_workspaces:
-                defined_name = False
-                try:
-                    defined_name = config.get('Workspaces', 'workspace_' + str(active_frame))
-                except:
-                    pass
-                if defined_name:
-                    i3.command('workspace ' + defined_name)
-                    break
+            cmd = ""
+            if active_frame not in global_knowledge["wss"].keys():
+                cmd += '[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + new_wss[active_frame].name + ';'
+            cmd += 'workspace ' + str(active_frame)
+            i3.command(cmd)
+            break
 
         for frame in frames.keys():
             if frames[frame]['active'] and not frame == active_frame:

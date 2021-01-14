@@ -1,23 +1,11 @@
-[Capture]
-
-screenshot_width = None
-screenshot_height = None
-screenshot_offset_x = None
-screenshot_offset_y = None
-
 [UI]
 
-window_width = None
-window_height = None
 bgcolor = None
 
-workspaces = None
-grid_x = None
-grid_y = None
-padding_percent_x = None
-padding_percent_y = None
-spacing_percent_x = None
-spacing_percent_y = None
+padding_percent_x = 5 
+padding_percent_y = 5 
+spacing_percent_x = 5 
+spacing_percent_y = 5 
 
 frame_width_px = None
 frame_active_color = None
@@ -32,7 +20,6 @@ tile_unknown_color = None
 tile_empty_color = None
 tile_nonexistant_color = None
 
-names_show = None
 names_font = None
 names_fontsize = None
 names_color = None
@@ -40,8 +27,3 @@ names_color = None
 thumb_stretch = None
 highlight_percentage = None
 
-switch_to_empty_workspaces = None
-
-[Workspaces]
-
-workspace_1 = 1:Firefox
