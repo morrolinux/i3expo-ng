@@ -59,10 +59,12 @@ def signal_show(signal, frame):
         win_y = focused_win.rect.y
         win_name = focused_win.name
         win_id = focused_win.id
+        win_size = (focused_win.window_rect.width, focused_win.window_rect.height)
         screenshot = grab_screen(x=win_x, y=win_y, w=win_w, h=win_h)
         global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot'] = screenshot
         global_knowledge['wss'][global_knowledge['active']]['focused_win_name'] = win_name
         global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = win_id
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_size'] = win_size
 
         global_updates_running = False
         i3.command('workspace i3expod-temporary-workspace')
@@ -178,7 +180,9 @@ def update_workspace(workspace, screenshot=None):
                 'screenshot': None,
                 'windows': {},
                 'size': (1920, 1080),
-                'output': ""
+                'output': "",
+                'focused_win_screenshot': None,
+                'focused_win_size': None
         }
 
     if screenshot is not None:
@@ -428,7 +432,8 @@ def show_ui():
                             offset_x = round((shot_inner_x - result_x) / 2)
                             offset_y = 0
                         image = pygame.transform.smoothscale(image, (result_x, result_y))
-                    screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
+                    if image is not None:
+                        screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
 
                 mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
                 lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
@@ -470,10 +475,12 @@ def show_ui():
     row_idx = 0
 
     screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
-    rw = int(screenshot.get_width()/5)
-    rh = int(screenshot.get_height()/5)
+    rw = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][0]/5)
+    rh = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][1]/5)
     rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
-    image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
+    image = None
+    if screenshot is not None:
+        image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
     focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
     focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
     RED = (255, 0, 0)
@@ -587,8 +594,11 @@ def show_ui():
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
         lightmask.fill((255,255,0,255 * 70 / 100))
+
         screen.blit(lightmask, (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2)))
-        screen.blit(image, rectangle)
+
+        if image is not None:
+            screen.blit(image, rectangle)
         
         pygame.display.update()
         # pygame.time.wait(25)
