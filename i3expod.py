@@ -592,7 +592,8 @@ def show_ui():
             frames[active_frame]['active'] = True
 
         # DRAW active window and border
-        win_pad = max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100)
+        win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
+        win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
         lightmask.fill(YELLOW + (255 * 70 / 100,))
