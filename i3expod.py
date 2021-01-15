@@ -249,25 +249,29 @@ def show_ui():
     global global_updates_running
     import math
 
-    workspaces = len(global_knowledge["wss"])
+    FPS = 60
+    YELLOW = (255, 255, 0) 
 
+    clock = pygame.time.Clock()
+
+    workspaces = len(global_knowledge["wss"])
     outputs = global_knowledge["outputs"]
+    monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
+
     grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
     
     padding_x = get_config('UI', 'padding_percent_x')
     padding_y = get_config('UI', 'padding_percent_y')
     spacing_x = get_config('UI', 'spacing_percent_x')
     spacing_y = get_config('UI', 'spacing_percent_y')
+
     frame_width = get_config('UI', 'frame_width_px')
-    
     frame_active_color = get_config('UI', 'frame_active_color')
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
     frame_unknown_color = get_config('UI', 'frame_unknown_color')
     frame_empty_color = get_config('UI', 'frame_empty_color')
     frame_nonexistant_color = get_config('UI', 'frame_nonexistant_color')
     
-    # tile_active_color = get_config('UI', 'tile_active_color')
-    # tile_inactive_color = get_config('UI', 'tile_inactive_color')
     tile_active_color = get_config('UI', 'bgcolor')
     tile_inactive_color = get_config('UI', 'bgcolor')
     tile_unknown_color = get_config('UI', 'tile_unknown_color')
@@ -280,17 +284,13 @@ def show_ui():
 
     highlight_percentage = get_config('UI', 'highlight_percentage')
 
-    monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
-
-    flags = pygame.RESIZABLE
-    if args.fullscreen:
-        flags = pygame.FULLSCREEN
-    
-    screen = pygame.display.set_mode((monitor_size[0], monitor_size[1]), flags)
+    # Create screen surface and set display options
+    screen_mode = pygame.FULLSCREEN if args.fullscreen else pygame.RESIZABLE
+    screen = pygame.display.set_mode((monitor_size[0], monitor_size[1]), screen_mode)
     screen.set_alpha(None)
-
     pygame.display.set_caption('i3expo-ng')
 
+    # Usable screen space (if windowed it won't match monitor_size)
     total_x = screen.get_width()
     total_y = screen.get_height()
 
@@ -304,67 +304,81 @@ def show_ui():
 
     shot_outer_x = round((total_x - 2 * pad_x - space_x * (grid_x - 1)) / grid_x)
     shot_outer_y = round((total_y - 2 * pad_y - space_y * (grid_y - 1)) / grid_y)
-
     shot_inner_x = shot_outer_x - 2 * frame_width 
     shot_inner_y = shot_outer_y - 2 * frame_width
-
     offset_delta_x = shot_outer_x + space_x
     offset_delta_y = shot_outer_y + space_y
 
-    
-    missing = pygame.Surface((150,200), pygame.SRCALPHA, 32) 
-    missing = missing.convert_alpha()
-    neww = missing.copy()
+    # Thumbnails for ? and +
+    thumb_missing = pygame.Surface((150,200), pygame.SRCALPHA, 32) 
+    thumb_missing = thumb_missing.convert_alpha()
+    thumb_new = thumb_missing.copy()
     qm = pygame.font.SysFont('sans-serif', 150).render('?', True, (150, 150, 150))
     plss = pygame.font.SysFont('sans-serif', 150).render('+', True, (150, 150, 150))
     qm_size = qm.get_rect().size
     origin_x = round((150 - qm_size[0])/2)
     origin_y = round((200 - qm_size[1])/2)
-    missing.blit(qm, (origin_x, origin_y))
-    neww.blit(plss, (origin_x, origin_y))
-
-    frames = {}
+    thumb_missing.blit(qm, (origin_x, origin_y))
+    thumb_new.blit(plss, (origin_x, origin_y))
 
     font = pygame.font.SysFont(names_font, names_fontsize)
 
-    new_wss = {}
+    # Get existing workspaces indexes
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
-    # generate one new/empty ws for each display output available
     wss_idx.sort()
-    r = max(1000, wss_idx[-1])
-    # r = 1000
+
+    # Generate one new/empty ws for each display output available
+    r = max(1000, wss_idx[-1])  # or r = 1000
+    new_wss = {}
     for out in outputs:
         while r in wss_idx:
             r += 1
         wss_idx.append(r)
         new_wss[r] = out
-        
     wss_idx.sort()
 
-    # desktop index matrix for keyboard navigation
+    # Desktop index matrix for keyboard navigation
     kbd_grid = [-1 for _ in range(grid_y)]
     for i in range(len(kbd_grid)):
         kbd_grid[i] = [-1 for _ in range(grid_x)]
         
-    cache = {i: None for i in wss_idx}
-    frames = {i: {'active': False, 
-                'mouseoff': None, 
-                'mouseon': None, 
-                'mouseondrag': None, 
-                'ul': (None, None), 
-                'br': (None, None)} for i in wss_idx}
+    # Thumbnails and frames cache
+    thumb_cache = {i: None for i in wss_idx}
+    frame_template = {'active': False,
+            'mouseoff': None,
+            'mouseon': None,
+            'mouseondrag': None,
+            'ul': (None, None),
+            'br': (None, None)} 
+    frames = {i: frame_template.copy() for i in wss_idx}
+
+    def gen_active_win_overlay(rectangle):
+        # Calculate active border overlay
+        win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
+        win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
+        lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
+                pygame.SRCALPHA, 32).convert_alpha()
+        # highlight_percentage = 5
+        lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
+        lightmask.fill(YELLOW + (255 * highlight_percentage / 100,))
+        return lightmask, lightmask_position
 
     def draw_grid():
         wsi = 0
         screen.fill(get_config('UI', 'bgcolor'))
         for y in range(grid_y):
             for x in range(grid_x):
+                # This is the stop condition because the grid cardinality 
+                # will often be higher than the number of thumbs
                 if wsi >= len(wss_idx):
                     break
+
+                # Extract the next workspace index and place it on the matrix
                 index = wss_idx[wsi]
                 kbd_grid[y][x] = index
                 wsi += 1
 
+                # Different properties for different kinds of thumbnails
                 if global_knowledge['active'] == index:
                     tile_color = tile_active_color
                     frame_color = frame_active_color
@@ -377,7 +391,7 @@ def show_ui():
                 elif index in global_knowledge["wss"].keys():
                     tile_color = tile_unknown_color
                     frame_color = frame_unknown_color
-                    image = missing
+                    image = thumb_missing
                 elif index <= workspaces:
                     tile_color = tile_empty_color
                     frame_color = frame_empty_color
@@ -385,14 +399,15 @@ def show_ui():
                 else:
                     tile_color = tile_nonexistant_color
                     frame_color = frame_nonexistant_color
-                    image = neww
+                    image = thumb_new
 
+                # Calculate and assign upper left and bottom right coords for each thumb
                 origin_x = pad_x + offset_delta_x * x
                 origin_y = pad_y + offset_delta_y * y
-
                 frames[index]['ul'] = (origin_x, origin_y)
                 frames[index]['br'] = (origin_x + shot_outer_x, origin_y + shot_outer_y)
 
+                # Draw frame and tile
                 screen.fill(frame_color,
                         (
                             origin_x,
@@ -410,6 +425,7 @@ def show_ui():
                         ))
 
                 if image:
+                    # Calculate thumbnail placement and size
                     image_size = image.get_rect().size
                     image_x = image_size[0]
                     image_y = image_size[1]
@@ -426,14 +442,17 @@ def show_ui():
                         offset_x = round((shot_inner_x - result_x) / 2)
                         offset_y = 0
 
-                    if cache[index] is not None:
-                        image = cache[index]
+                    # Rescale the screenshot as a thumbnail and cache it, or use the cached result if present
+                    if thumb_cache[index] is not None:
+                        image = thumb_cache[index]
                     else:
                         image = pygame.transform.smoothscale(image, (result_x, result_y))
-                        cache[index] = image
+                        thumb_cache[index] = image
 
+                    # DRAW the screenshot as a thumbnail
                     screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
 
+                # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
                     mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
                     lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
@@ -449,13 +468,12 @@ def show_ui():
                     frames[index]['mouseondrag'] = mouseondrag.copy()
                     frames[index]['mouseoff'] = mouseoff.copy()
 
-                # put the right label (workspace name or output name for the ws to be created on)
+                # Put the right label (workspace name or output name for the ws to be created on)
                 if index in global_knowledge["wss"].keys():
                     name = global_knowledge["wss"][index]['name']
                     name += " (" + global_knowledge["wss"][index]['output'] + ")"
                 else:
                     name = new_wss[index].name
-
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
                 name_x = origin_x + round((shot_outer_x - name_width) / 2)
@@ -465,37 +483,42 @@ def show_ui():
 
     pygame.display.flip()
 
+    # set initial status
+    active_frame = None
+    last_active_frame = 1
+    rectangle_dragging = False
     running = True
     use_mouse = True
 
-    active_frame = None
-    last_active_frame = 1
-
+    # For keyboard navigation
     col_idx = 0
     row_idx = 0
 
+    # Focused window thumb overlay to be dragged over to workspaces
     screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
-    rw = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][0]/5)
-    rh = int(global_knowledge['wss'][global_knowledge['active']]['focused_win_size'][1]/5)
+    focused_win_size = global_knowledge['wss'][global_knowledge['active']]['focused_win_size']
+    rw = int(focused_win_size[0]/5) if focused_win_size is not None else 0
+    rh = int(focused_win_size[1]/5) if focused_win_size is not None else 0
     rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
-    focused_win_image = None
-    if screenshot is not None:
-        focused_win_image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
+    focused_win_thumb = pygame.transform.smoothscale(screenshot, (rectangle.width, rectangle.height))\
+            if screenshot is not None else None
     focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
     focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
-    YELLOW = (255, 255, 0) 
-    FPS = 60
-    rectangle_dragging = False
-    clock = pygame.time.Clock()
 
+    # Precalculate lightmask coordinates
+    lightmask, lightmask_position = gen_active_win_overlay(rectangle)
     draw_grid()
 
     while running and not global_updates_running and pygame.display.get_init():
+
+        # Avoid trailing effect when dragging the focused window preview over a workspace
         if rectangle_dragging:
             draw_grid()
+
         jump = False
         move_win = False
         kbdmove = (0, 0)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -527,7 +550,7 @@ def show_ui():
                 if event.button == 1:
                     if rectangle_dragging:
                         move_win = True
-                    jump = True # if not rectangle_dragging else False
+                    jump = True  
                     rectangle_dragging = False
                 pygame.event.clear()
                 break
@@ -540,6 +563,7 @@ def show_ui():
                         offset_x = rectangle.x - mouse_x
                         offset_y = rectangle.y - mouse_y
 
+        # Determine which frame is being hovered either with the mouse or keyboard selection
         if use_mouse:
             mpos = pygame.mouse.get_pos()
             af = get_hovered_frame(mpos, frames)
@@ -569,10 +593,7 @@ def show_ui():
 
         if move_win:
             cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
-            # if active_frame not in global_knowledge["wss"].keys():
-            #     cmd += ';[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + new_wss[active_frame].name
             i3.command(cmd)
-
         if jump:
             cmd = ""
             if active_frame not in global_knowledge["wss"].keys():
@@ -581,6 +602,7 @@ def show_ui():
             i3.command(cmd)
             break
 
+        # DRAW mouseoff, mouseon, mouseondrag overlays
         for frame in frames.keys():
             if frames[frame]['active'] and not frame == active_frame:
                 screen.blit(frames[frame]['mouseoff'], frames[frame]['ul'])
@@ -591,20 +613,16 @@ def show_ui():
                 screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
             frames[active_frame]['active'] = True
 
-        # DRAW active window and border
-        win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
-        win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
-        lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
-                pygame.SRCALPHA, 32).convert_alpha()
-        lightmask.fill(YELLOW + (255 * 70 / 100,))
+        if rectangle_dragging:
+            lightmask, lightmask_position = gen_active_win_overlay(rectangle)
 
-        screen.blit(lightmask, (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2)))
+        # DRAW active window border overlay
+        screen.blit(lightmask, lightmask_position)
 
-        if focused_win_image is not None:
-            screen.blit(focused_win_image, rectangle)
-        
+        # DRAW active window thumbnail
+        screen.blit(focused_win_thumb, rectangle) if focused_win_thumb is not None else None
+
         pygame.display.update()
-        # pygame.time.wait(25)
         clock.tick(FPS)
 
 
