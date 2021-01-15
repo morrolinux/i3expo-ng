@@ -330,7 +330,9 @@ def show_ui():
     new_wss = {}
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
     # generate one new/empty ws for each display output available
-    r = 1000
+    wss_idx.sort()
+    r = max(1000, wss_idx[-1])
+    # r = 1000
     for out in outputs:
         while r in wss_idx:
             r += 1
@@ -481,7 +483,7 @@ def show_ui():
         focused_win_image = pygame.transform.smoothscale(screenshot,(rectangle.width, rectangle.height))
     focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
     focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
-    RED = (255, 0, 0)
+    YELLOW = (255, 255, 0) 
     FPS = 60
     rectangle_dragging = False
     clock = pygame.time.Clock()
@@ -583,7 +585,7 @@ def show_ui():
             if frames[frame]['active'] and not frame == active_frame:
                 screen.blit(frames[frame]['mouseoff'], frames[frame]['ul'])
                 frames[frame]['active'] = False
-        if active_frame and not frames[active_frame]['active']:
+        if active_frame: # and not frames[active_frame]['active']:
             screen.blit(frames[active_frame]['mouseon'], frames[active_frame]['ul'])
             if rectangle_dragging:
                 screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
@@ -593,7 +595,7 @@ def show_ui():
         win_pad = max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100)
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
-        lightmask.fill((255,255,0,255 * 70 / 100))
+        lightmask.fill(YELLOW + (255 * 70 / 100,))
 
         screen.blit(lightmask, (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2)))
 
