@@ -485,7 +485,7 @@ def show_ui():
 
     # set initial status
     active_frame = None
-    last_active_frame = 1
+    last_active_frame = wss_idx[0]
     rectangle_dragging = False
     running = True
     use_mouse = True
