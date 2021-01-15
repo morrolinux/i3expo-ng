@@ -353,15 +353,14 @@ def show_ui():
             'br': (None, None)} 
     frames = {i: frame_template.copy() for i in wss_idx}
 
-    def gen_active_win_overlay(rectangle):
+    def gen_active_win_overlay(rectangle, alpha=100):
         # Calculate active border overlay
         win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
         win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
-        # highlight_percentage = 5
         lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
-        lightmask.fill(YELLOW + (255 * highlight_percentage / 100,))
+        lightmask.fill(YELLOW + (255 * alpha / 100,))
         return lightmask, lightmask_position
 
     def draw_grid():
@@ -490,6 +489,7 @@ def show_ui():
     rectangle_dragging = False
     running = True
     use_mouse = True
+    grid_dirty_flag = False
 
     # For keyboard navigation
     col_idx = 0
@@ -509,9 +509,13 @@ def show_ui():
         focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
         focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
 
-    # Precalculate lightmask for focused window thumbnail
+    # Precalculate and draw lightmask for focused window thumbnail
     lightmask, lightmask_position = gen_active_win_overlay(rectangle)
+
+    # Draw grid and focused window thumbnail overlay border
     draw_grid()
+    screen.blit(lightmask, lightmask_position)
+    screen.blit(focused_win_thumb, rectangle) if focused_win_thumb is not None else None
 
     while running and not global_updates_running and pygame.display.get_init():
 
@@ -613,20 +617,21 @@ def show_ui():
             if frames[frame]['active'] and not frame == active_frame:
                 screen.blit(frames[frame]['mouseoff'], frames[frame]['ul'])
                 frames[frame]['active'] = False
+                grid_dirty_flag = True
         if active_frame: # and not frames[active_frame]['active']:
             screen.blit(frames[active_frame]['mouseon'], frames[active_frame]['ul'])
+            grid_dirty_flag = True
             if rectangle_dragging:
                 screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
             frames[active_frame]['active'] = True
 
-        if rectangle_dragging:
+        if rectangle_dragging or grid_dirty_flag:
+            grid_dirty_flag = False
             lightmask, lightmask_position = gen_active_win_overlay(rectangle)
-
-        # DRAW active window border overlay
-        screen.blit(lightmask, lightmask_position)
-
-        # DRAW active window thumbnail
-        screen.blit(focused_win_thumb, rectangle) if focused_win_thumb is not None else None
+            # DRAW active window border overlay
+            screen.blit(lightmask, lightmask_position)
+            # DRAW active window thumbnail
+            screen.blit(focused_win_thumb, rectangle) if focused_win_thumb is not None else None
 
         pygame.display.update()
         clock.tick(FPS)
