@@ -247,6 +247,7 @@ def get_hovered_frame(mpos, frames):
 
 def show_ui():
     global global_updates_running
+    from contextlib import suppress
     import math
 
     FPS = 60
@@ -502,10 +503,13 @@ def show_ui():
     rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
     focused_win_thumb = pygame.transform.smoothscale(screenshot, (rectangle.width, rectangle.height))\
             if screenshot is not None else None
-    focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
-    focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
 
-    # Precalculate lightmask coordinates
+    focused_win_name = focused_win_id = None
+    with suppress(KeyError):
+        focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
+        focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
+
+    # Precalculate lightmask for focused window thumbnail
     lightmask, lightmask_position = gen_active_win_overlay(rectangle)
     draw_grid()
 
@@ -592,6 +596,8 @@ def show_ui():
             last_active_frame = active_frame
 
         if move_win:
+            if focused_win_id is None:
+                break
             cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
             i3.command(cmd)
         if jump:
@@ -629,6 +635,7 @@ def show_ui():
     pygame.display.quit()
     pygame.display.init()
     global_updates_running = True
+
     if not jump:
         i3.command('workspace ' + str(global_knowledge["active"]))
 
@@ -643,7 +650,7 @@ if __name__ == '__main__':
     i3.on('window::move', update_state)
     i3.on('window::floating', update_state)
     i3.on('window::fullscreen_mode', update_state)
-    #i3.on('workspace', update_state)
+    i3.on('workspace', update_state)
 
     i3_thread = Thread(target = i3.main)
     i3_thread.daemon = True
