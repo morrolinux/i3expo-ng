@@ -353,14 +353,14 @@ def show_ui():
             'br': (None, None)} 
     frames = {i: frame_template.copy() for i in wss_idx}
 
-    def gen_active_win_overlay(rectangle, alpha=100):
+    def gen_active_win_overlay(rectangle, alpha=255):
         # Calculate active border overlay
         win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
         win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
         lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
                 pygame.SRCALPHA, 32).convert_alpha()
         lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
-        lightmask.fill(YELLOW + (255 * alpha / 100,))
+        lightmask.fill(YELLOW + (alpha,))
         return lightmask, lightmask_position
 
     def draw_grid():
@@ -514,9 +514,21 @@ def show_ui():
 
     # Draw grid and focused window thumbnail overlay border
     draw_grid()
-    screen.blit(lightmask, lightmask_position)
-    screen.blit(focused_win_thumb, rectangle) if focused_win_thumb is not None else None
 
+    if focused_win_thumb is not None:
+        lightmask, lightmask_position = gen_active_win_overlay(rectangle, alpha=0)
+        screen.blit(lightmask, lightmask_position)
+        speed = int(300 / FPS)
+        for i in range(0, 100, speed):
+            alpha = int(255 * i / 100)
+            f = focused_win_thumb.convert_alpha()
+            f.fill((255, 255, 255, alpha), None, pygame.BLEND_RGBA_MULT)
+            lightmask.fill(YELLOW + (int(alpha/8),))
+            screen.blit(lightmask, lightmask_position)
+            screen.blit(f, rectangle) 
+            pygame.display.flip()
+            clock.tick(FPS)
+            
     while running and not global_updates_running and pygame.display.get_init():
 
         # Avoid trailing effect when dragging the focused window preview over a workspace
