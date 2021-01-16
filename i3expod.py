@@ -25,12 +25,13 @@ parser.add_argument("-f", "--fullscreen", action="store_true",
 parser.add_argument("-m", "--mode", default="filler", help="Workspace allocation logic.\
         sequential: Any new workspace is always the last one, starting from 1000. e.g: [1, 3] -> [1, 3, 1000]\
         filler [default]: Allocate new workspaces by filling gaps in indexes e.g: [1, 3] -> [1, 2, 3]")
+parser.add_argument("-w", "--wp", default=None, help="Set your wallpaper to be used to represent new/empty workspaces")
 args = parser.parse_args()
 
 pp = pprint.PrettyPrinter(indent=4)
 
 global_updates_running = True
-global_knowledge = {'active': 0, 'wss': {}}
+global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}}
 
 pygame.display.init()
 pygame.font.init()
@@ -250,8 +251,9 @@ def get_hovered_frame(mpos, frames):
 
 def show_ui():
     global global_updates_running
-    from contextlib import suppress
     import math
+    from contextlib import suppress
+    from PIL import Image, ImageFilter, ImageEnhance
 
     FPS = 60
     YELLOW = (255, 255, 0) 
@@ -314,15 +316,31 @@ def show_ui():
     offset_delta_y = shot_outer_y + space_y
 
     # Thumbnails for ? and +
-    thumb_missing = pygame.Surface((150,200), pygame.SRCALPHA, 32) 
+    thumb_missing = pygame.Surface((monitor_size[0], monitor_size[1]), pygame.SRCALPHA, 32) 
     thumb_missing = thumb_missing.convert_alpha()
     thumb_new = thumb_missing.copy()
-    qm = pygame.font.SysFont('sans-serif', 150).render('?', True, (150, 150, 150))
-    plss = pygame.font.SysFont('sans-serif', 150).render('+', True, (150, 150, 150))
+    qm = pygame.font.SysFont('sans-serif', 550).render('?', True, (150, 150, 150))
+    plss = pygame.font.SysFont('sans-serif', 550).render('+', True, (200, 200, 200))
     qm_size = qm.get_rect().size
-    origin_x = round((150 - qm_size[0])/2)
-    origin_y = round((200 - qm_size[1])/2)
+    origin_x = round((monitor_size[0] - qm_size[0])/2)
+    origin_y = round((monitor_size[1] - qm_size[1])/2)
     thumb_missing.blit(qm, (origin_x, origin_y))
+
+    # if a wallpaper was specified, use that as a background for thumb_new
+    if args.wp is not None:
+        if 'wp_img' not in global_knowledge['ui_cache'].keys():
+            wp_img = pygame.image.load(args.wp)
+            im = Image.open(args.wp)
+            en = ImageEnhance.Brightness(im)
+            wp_img = en.enhance(0.4)
+            wp_img = wp_img\
+                    .resize((monitor_size[0], monitor_size[1]), Image.NEAREST)\
+                    .filter(ImageFilter.GaussianBlur(radius=20))
+            wp_img = pygame.image.fromstring(wp_img.tobytes(), wp_img.size, wp_img.mode)
+            global_knowledge['ui_cache']['wp_img'] = wp_img
+        wp_img = global_knowledge['ui_cache']['wp_img']
+        thumb_new.blit(wp_img, (0, 0))
+
     thumb_new.blit(plss, (origin_x, origin_y))
 
     font = pygame.font.SysFont(names_font, names_fontsize)
