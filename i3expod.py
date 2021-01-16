@@ -22,6 +22,9 @@ from xdg.BaseDirectory import xdg_config_home
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
                     help="run in fullscreen")
+parser.add_argument("-m", "--mode", default="filler", help="Workspace allocation logic.\
+        sequential: Any new workspace is always the last one, starting from 1000. e.g: [1, 3] -> [1, 3, 1000]\
+        filler [default]: Allocate new workspaces by filling gaps in indexes e.g: [1, 3] -> [1, 2, 3]")
 args = parser.parse_args()
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -329,7 +332,11 @@ def show_ui():
     wss_idx.sort()
 
     # Generate one new/empty ws for each display output available
-    r = max(1000, wss_idx[-1])  # or r = 1000
+    if args.mode == "sequential":
+        r = max(1000, wss_idx[-1])  # or r = 1000
+    elif args.mode == "filler":
+        r = 1
+
     new_wss = {}
     for out in outputs:
         while r in wss_idx:
@@ -392,10 +399,10 @@ def show_ui():
                     tile_color = tile_unknown_color
                     frame_color = frame_unknown_color
                     image = thumb_missing
-                elif index <= workspaces:
-                    tile_color = tile_empty_color
-                    frame_color = frame_empty_color
-                    image = None
+                # elif index <= workspaces:
+                #     tile_color = tile_empty_color
+                #     frame_color = frame_empty_color
+                #     image = None
                 else:
                     tile_color = tile_nonexistant_color
                     frame_color = frame_nonexistant_color
@@ -667,7 +674,7 @@ if __name__ == '__main__':
     i3.on('window::move', update_state)
     i3.on('window::floating', update_state)
     i3.on('window::fullscreen_mode', update_state)
-    i3.on('workspace', update_state)
+    # i3.on('workspace', update_state)
 
     i3_thread = Thread(target = i3.main)
     i3_thread.daemon = True
