@@ -266,12 +266,8 @@ def show_ui():
 
     grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
     
-    padding_x = get_config('UI', 'padding_percent_x')
-    padding_y = get_config('UI', 'padding_percent_y')
-    spacing_x = get_config('UI', 'spacing_percent_x')
-    spacing_y = get_config('UI', 'spacing_percent_y')
+    frame_thickness = get_config('UI', 'frame_width_px')
 
-    frame_width = get_config('UI', 'frame_width_px')
     frame_active_color = get_config('UI', 'frame_active_color')
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
     frame_unknown_color = get_config('UI', 'frame_unknown_color')
@@ -297,23 +293,28 @@ def show_ui():
     pygame.display.set_caption('i3expo-ng')
 
     # Usable screen space (if windowed it won't match monitor_size)
-    total_x = screen.get_width()
-    total_y = screen.get_height()
+    # screen_w = screen.get_width()
+    # screen_h = screen.get_height()
+    screen_w = monitor_size[0]
+    screen_h = monitor_size[1]
 
     # Padding/margin for tiles
-    pad_x = round(total_x * padding_x / 100)
-    pad_y = round(total_y * padding_y / 100)
+    pad_w = round(screen_w * get_config('UI', 'padding_percent_x') / 100)
+    pad_h = round(screen_h * get_config('UI', 'padding_percent_y') / 100)
 
-    # Gap between tiles
-    space_x = round(total_x * spacing_x / 100)
-    space_y = round(total_y * spacing_y / 100)
+    # Gap between tiles (do not confuse with frames)
+    tiles_gap_w = round(screen_w * get_config('UI', 'spacing_percent_x') / 100)
+    tiles_gap_h = round(screen_h * get_config('UI', 'spacing_percent_y') / 100)
 
-    shot_outer_x = round((total_x - 2 * pad_x - space_x * (grid_x - 1)) / grid_x)
-    shot_outer_y = round((total_y - 2 * pad_y - space_y * (grid_y - 1)) / grid_y)
-    shot_inner_x = shot_outer_x - 2 * frame_width 
-    shot_inner_y = shot_outer_y - 2 * frame_width
-    offset_delta_x = shot_outer_x + space_x
-    offset_delta_y = shot_outer_y + space_y
+    # Outer and inner tiles size (draw outer then inner to get the frame)
+    tiles_outer_w = round((screen_w - 2 * pad_w - tiles_gap_w * (grid_x - 1)) / grid_x)
+    tiles_outer_h = round((screen_h - 2 * pad_h - tiles_gap_h * (grid_y - 1)) / grid_y)
+    tiles_inner_w = tiles_outer_w - 2 * frame_thickness 
+    tiles_inner_h = tiles_outer_h - 2 * frame_thickness
+
+    # Gap between frames
+    frames_gap_w = tiles_outer_w + tiles_gap_w
+    frames_gap_h = tiles_outer_h + tiles_gap_h
 
     # Thumbnails for ? and +
     thumb_missing = pygame.Surface((monitor_size[0], monitor_size[1]), pygame.SRCALPHA, 32) 
@@ -427,26 +428,26 @@ def show_ui():
                     image = thumb_new
 
                 # Calculate and assign upper left and bottom right coords for each thumb
-                origin_x = pad_x + offset_delta_x * x
-                origin_y = pad_y + offset_delta_y * y
+                origin_x = pad_w + frames_gap_w * x
+                origin_y = pad_h + frames_gap_h * y
                 frames[index]['ul'] = (origin_x, origin_y)
-                frames[index]['br'] = (origin_x + shot_outer_x, origin_y + shot_outer_y)
+                frames[index]['br'] = (origin_x + tiles_outer_w, origin_y + tiles_outer_h)
 
                 # Draw frame and tile
                 screen.fill(frame_color,
                         (
                             origin_x,
                             origin_y,
-                            shot_outer_x,
-                            shot_outer_y,
+                            tiles_outer_w,
+                            tiles_outer_h,
                         ))
 
                 screen.fill(tile_color,
                         (
-                            origin_x + frame_width,
-                            origin_y + frame_width,
-                            shot_inner_x,
-                            shot_inner_y,
+                            origin_x + frame_thickness,
+                            origin_y + frame_thickness,
+                            tiles_inner_w,
+                            tiles_inner_h,
                         ))
 
                 if image:
@@ -454,17 +455,17 @@ def show_ui():
                     image_size = image.get_rect().size
                     image_x = image_size[0]
                     image_y = image_size[1]
-                    ratio_x = shot_inner_x / image_x
-                    ratio_y = shot_inner_y / image_y
+                    ratio_x = tiles_inner_w / image_x
+                    ratio_y = tiles_inner_h / image_y
                     if ratio_x < ratio_y:
-                        result_x = shot_inner_x
+                        result_x = tiles_inner_w
                         result_y = round(ratio_x * image_y)
                         offset_x = 0
-                        offset_y = round((shot_inner_y - result_y) / 2)
+                        offset_y = round((tiles_inner_h - result_y) / 2)
                     else:
                         result_x = round(ratio_y * image_x)
-                        result_y = shot_inner_y
-                        offset_x = round((shot_inner_x - result_x) / 2)
+                        result_y = tiles_inner_h
+                        offset_x = round((tiles_inner_w - result_x) / 2)
                         offset_y = 0
 
                     # Rescale the screenshot as a thumbnail and cache it, or use the cached result if present
@@ -475,12 +476,12 @@ def show_ui():
                         thumb_cache[index] = image
 
                     # DRAW the screenshot as a thumbnail
-                    screen.blit(image, (origin_x + frame_width + offset_x, origin_y + frame_width + offset_y))
+                    screen.blit(image, (origin_x + frame_thickness + offset_x, origin_y + frame_thickness + offset_y))
 
                 # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
-                    mouseoff = screen.subsurface((origin_x, origin_y, shot_outer_x, shot_outer_y)).copy()
-                    lightmask = pygame.Surface((shot_outer_x, shot_outer_y), pygame.SRCALPHA, 32)
+                    mouseoff = screen.subsurface((origin_x, origin_y, tiles_outer_w, tiles_outer_h)).copy()
+                    lightmask = pygame.Surface((tiles_outer_w, tiles_outer_h), pygame.SRCALPHA, 32)
                     lightmask.convert_alpha()
                     lightmask_drag = lightmask.copy()
                     lightmask.fill((255,255,255,255 * highlight_percentage / 100))
@@ -501,8 +502,8 @@ def show_ui():
                     name = new_wss[index].name
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
-                name_x = origin_x + round((shot_outer_x - name_width) / 2)
-                name_y = origin_y + shot_outer_y + round(shot_outer_y * 0.02)
+                name_x = origin_x + round((tiles_outer_w - name_width) / 2)
+                name_y = origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
                 screen.blit(name, (name_x, name_y))
 
 
