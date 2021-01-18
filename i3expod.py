@@ -254,6 +254,7 @@ def show_ui():
     import math
     from contextlib import suppress
     from PIL import Image, ImageFilter, ImageEnhance
+    import subprocess
 
     FPS = 60
     YELLOW = (255, 255, 0) 
@@ -262,7 +263,14 @@ def show_ui():
 
     workspaces = len(global_knowledge["wss"])
     outputs = global_knowledge["outputs"]
-    monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
+
+    # Get the primary monitor size
+    # pygame doesn't return the primary screen size but the first screen...
+    # monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
+    output = subprocess.Popen('xrandr | grep "\*" | cut -d" " -f4', \
+        shell=True, stdout=subprocess.PIPE).communicate()[0]
+    resolution = output.split()[0].split(b'x')
+    monitor_size = (int(resolution[0]), int(resolution[1]))
 
     grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
 
@@ -314,10 +322,10 @@ def show_ui():
     pygame.display.set_caption('i3expo-ng')
 
     # Usable screen space (if windowed it won't match monitor_size)
-    # screen_w = screen.get_width()
-    # screen_h = screen.get_height()
-    screen_w = monitor_size[0]
-    screen_h = monitor_size[1]
+    screen_w = screen.get_width()
+    screen_h = screen.get_height()
+    # screen_w = monitor_size[0]
+    # screen_h = monitor_size[1]
 
     # Padding/margin for tiles
     pad_w = round(screen_w * get_config('UI', 'padding_percent_x') / 100)
@@ -450,7 +458,7 @@ def show_ui():
 
                     # If it fits on the row, place it and remove its index from the todo list
                     if origin_x + tiles_outer_w_dyn <= screen_w - pad_w:
-                        print("Adding", idx, tiles_inner_w_dyn, tiles_outer_w_dyn)
+                        # print("Adding", idx, tiles_inner_w_dyn, tiles_outer_w_dyn)
                         index = idx
                         del wss_idx_todo[i]
                         break
@@ -500,34 +508,35 @@ def show_ui():
                             tiles_inner_h,
                         ))
 
-                if image:
-                    # Calculate thumbnail placement and size
-                    image_size = image.get_rect().size
-                    image_x = image_size[0]
-                    image_y = image_size[1]
-                    crop = None
+                # Calculate thumbnail placement and size
+                image_size = image.get_rect().size
+                image_x = image_size[0]
+                image_y = image_size[1]
+                crop = None
 
-                    if tiles_inner_w_dyn < tiles_inner_h and image_x > image_y:
-                        result_x = tiles_inner_w
-                        result_y = tiles_inner_h
-                        offset_x = round((tiles_inner_w - result_x) / 2)
-                        offset_y = 0
-                        crop = (tiles_inner_w/2 - tiles_inner_w_dyn/2, 0, tiles_inner_w_dyn, tiles_inner_h)
-                    else:
-                        result_x = tiles_inner_w_dyn
-                        result_y = tiles_inner_h
-                        offset_x = 0
-                        offset_y = round((tiles_inner_h - result_y) / 2)
+                print("frame {}. Scaling image...".format(index))
+                print(image_x, image_y, tiles_inner_w_dyn, tiles_inner_h)
+                if image_x > image_y and tiles_inner_w_dyn < tiles_inner_h:
+                    result_x = tiles_inner_w
+                    result_y = tiles_inner_h
+                    offset_x = round((tiles_inner_w - result_x) / 2)
+                    offset_y = 0
+                    crop = (tiles_inner_w/2 - tiles_inner_w_dyn/2, 0, tiles_inner_w_dyn, tiles_inner_h)
+                else:
+                    result_x = tiles_inner_w_dyn
+                    result_y = tiles_inner_h
+                    offset_x = 0
+                    offset_y = round((tiles_inner_h - result_y) / 2)
 
-                    # Rescale the screenshot as a thumbnail and cache it, or use the cached result if present
-                    if thumb_cache[index] is not None:
-                        image = thumb_cache[index]
-                    else:
-                        image = pygame.transform.smoothscale(image, (result_x, result_y))
-                        thumb_cache[index] = image
+                # Rescale the screenshot as a thumbnail and cache it, or use the cached result if present
+                if thumb_cache[index] is not None:
+                    image = thumb_cache[index]
+                else:
+                    image = pygame.transform.smoothscale(image, (result_x, result_y))
+                    thumb_cache[index] = image
 
-                    # DRAW the screenshot as a thumbnail
-                    screen.blit(image, (origin_x + frame_thickness + offset_x, origin_y + frame_thickness + offset_y), crop)
+                # DRAW the screenshot as a thumbnail
+                screen.blit(image, (origin_x + frame_thickness + offset_x, origin_y + frame_thickness + offset_y), crop)
 
                 # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
