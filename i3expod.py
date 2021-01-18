@@ -706,6 +706,7 @@ def show_ui():
             cmd = ""
             if active_frame not in global_knowledge["wss"].keys():
                 cmd += '[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + new_wss[active_frame].name + ';'
+            cmd += 'workspace back_and_forth;'
             cmd += 'workspace ' + str(active_frame)
             i3.command(cmd)
             break
