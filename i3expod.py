@@ -31,7 +31,7 @@ args = parser.parse_args()
 pp = pprint.PrettyPrinter(indent=4)
 
 global_updates_running = True
-global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}}
+global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary': None}
 
 pygame.display.init()
 pygame.font.init()
@@ -70,8 +70,23 @@ def signal_show(signal, frame):
         global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = win_id
         global_knowledge['wss'][global_knowledge['active']]['focused_win_size'] = win_size
 
+        # Get primary monitor name
+        import subprocess
+        output = subprocess.Popen('xrandr | grep "primary" | cut -d" " -f1', \
+            shell=True, stdout=subprocess.PIPE).communicate()[0]
+        primary_output_name = output.split()[0].decode()
+
+        # Get the visible workspace on the primary monitor
+        visible_ws_primary = [w.ipc_data['num'] for w in i3.get_workspaces() \
+            if w.ipc_data['visible'] == True and w.ipc_data['output'] == primary_output_name][0]
+
+        global_knowledge['visible_ws_primary'] = visible_ws_primary
+
         global_updates_running = False
-        i3.command('workspace i3expod-temporary-workspace')
+        i3.command('workspace ' + str(visible_ws_primary) + '; workspace i3expod-temporary-workspace')
+        # i3.command('workspace ' + visible_ws_primary)
+        # i3.command('workspace i3expod-temporary-workspace')
+
         ui_thread = Thread(target = show_ui)
         ui_thread.daemon = True
         ui_thread.start()
@@ -254,7 +269,6 @@ def show_ui():
     import math
     from contextlib import suppress
     from PIL import Image, ImageFilter, ImageEnhance
-    import subprocess
 
     FPS = 60
     YELLOW = (255, 255, 0) 
@@ -264,13 +278,8 @@ def show_ui():
     workspaces = len(global_knowledge["wss"])
     outputs = global_knowledge["outputs"]
 
-    # Get the primary monitor size
-    # pygame doesn't return the primary screen size but the first screen...
-    # monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-    output = subprocess.Popen('xrandr | grep "\*" | cut -d" " -f4', \
-        shell=True, stdout=subprocess.PIPE).communicate()[0]
-    resolution = output.split()[0].split(b'x')
-    monitor_size = (int(resolution[0]), int(resolution[1]))
+    # Get primary monitor size
+    monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
 
     grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
 
@@ -293,7 +302,7 @@ def show_ui():
             tmp += 1
     grid_x = grid_y = math.ceil(math.sqrt(tmp))
     grid_size = math.ceil(math.sqrt(workspaces + len(outputs)))
-    print("GRID SIZE: {} x {} ".format(grid_size, grid_size), "EFFICIENT SIZE: {} x {}".format(grid_x, grid_y))
+    # print("GRID SIZE: {} x {} ".format(grid_size, grid_size), "EFFICIENT SIZE: {} x {}".format(grid_x, grid_y))
 
     frame_thickness = get_config('UI', 'frame_width_px')
 
@@ -317,7 +326,7 @@ def show_ui():
 
     # Create screen surface and set display options
     screen_mode = pygame.FULLSCREEN if args.fullscreen else pygame.RESIZABLE
-    screen = pygame.display.set_mode((monitor_size[0], monitor_size[1]), screen_mode)
+    screen = pygame.display.set_mode(size=(monitor_size[0], monitor_size[1]), flags=screen_mode, depth=0, display=0)
     screen.set_alpha(None)
     pygame.display.set_caption('i3expo-ng')
 
@@ -514,8 +523,8 @@ def show_ui():
                 image_y = image_size[1]
                 crop = None
 
-                print("frame {}. Scaling image...".format(index))
-                print(image_x, image_y, tiles_inner_w_dyn, tiles_inner_h)
+                # print("frame {}. Scaling image...".format(index))
+                # print(image_x, image_y, tiles_inner_w_dyn, tiles_inner_h)
                 if image_x > image_y and tiles_inner_w_dyn < tiles_inner_h:
                     result_x = tiles_inner_w
                     result_y = tiles_inner_h
@@ -704,9 +713,12 @@ def show_ui():
             i3.command(cmd)
         if jump:
             cmd = ""
+            # Create a new empty workspace on the requested output
             if active_frame not in global_knowledge["wss"].keys():
-                cmd += '[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + new_wss[active_frame].name + ';'
-            cmd += 'workspace back_and_forth;'
+                cmd += '[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + \
+                    new_wss[active_frame].name + ';'
+            # Jump back to the visible ws on primary output to preserve back_and_forth behaviour
+            cmd += 'workspace ' + str(global_knowledge['visible_ws_primary']) + ';'
             cmd += 'workspace ' + str(active_frame)
             i3.command(cmd)
             break
@@ -741,7 +753,9 @@ def show_ui():
     global_updates_running = True
 
     if not jump:
-        i3.command('workspace ' + str(global_knowledge["active"]))
+        # i3.command('workspace ' + str(global_knowledge["active"]))
+        i3.command('workspace ' + str(global_knowledge['visible_ws_primary']) + ';')
+
 
 if __name__ == '__main__':
 
