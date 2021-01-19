@@ -386,7 +386,9 @@ def show_ui():
 
     # Get existing workspaces indexes
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
-    wss_idx.sort()
+    # Sort workspace indexes by aspect ratio (landscape then portrait)
+    wss_idx.sort(key=lambda x: global_knowledge['wss'][x]['size'][1])
+    # wss_idx.sort()
 
     # Generate one new/empty ws for each display output available
     if args.mode == "sequential":
@@ -394,13 +396,19 @@ def show_ui():
     elif args.mode == "filler":
         r = 1
 
-    new_wss = {}
+    new_wss_output = {}
+    tmp = []
     for out in outputs:
-        while r in wss_idx:
+        while r in wss_idx + tmp:
             r += 1
-        wss_idx.append(r)
-        new_wss[r] = out
-    wss_idx.sort()
+        new_wss_output[r] = out
+        tmp.append(r)
+
+    # Sort NEW workspace indexes by aspect ratio (landscape then portrait)
+    # and append them to the list of workspaces
+    tmp.sort(key=lambda x: new_wss_output[x].rect.width)
+    wss_idx.extend(tmp)
+    del tmp
 
     # Desktop index matrix for keyboard navigation
     kbd_grid = [-1 for _ in range(grid_y)]
@@ -456,8 +464,8 @@ def show_ui():
                         ws_width = global_knowledge["wss"][idx]['size'][0]
                         ws_height = global_knowledge["wss"][idx]['size'][1]
                     else:
-                        ws_width = new_wss[idx].rect.width
-                        ws_height = new_wss[idx].rect.height
+                        ws_width = new_wss_output[idx].rect.width
+                        ws_height = new_wss_output[idx].rect.height
 
                     # Resize frame width for vertical workspaces
                     if ws_height > ws_width:
@@ -568,7 +576,7 @@ def show_ui():
                     name = global_knowledge["wss"][index]['name']
                     name += " (" + global_knowledge["wss"][index]['output'] + ")"
                 else:
-                    name = new_wss[index].name
+                    name = new_wss_output[index].name
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
                 name_x = origin_x + round((tiles_outer_w_dyn- name_width) / 2)
@@ -715,8 +723,9 @@ def show_ui():
             cmd = ""
             # Create a new empty workspace on the requested output
             if active_frame not in global_knowledge["wss"].keys():
-                cmd += '[workspace=\"' + str(active_frame) + '\"] move workspace to output ' + \
-                    new_wss[active_frame].name + ';'
+                cmd += "workspace " + str(active_frame) + ";"
+                cmd += 'move workspace to output ' + \
+                    new_wss_output[active_frame].name + ';'
             # Jump back to the visible ws on primary output to preserve back_and_forth behaviour
             cmd += 'workspace ' + str(global_knowledge['visible_ws_primary']) + ';'
             cmd += 'workspace ' + str(active_frame)
