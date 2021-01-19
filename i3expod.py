@@ -609,9 +609,16 @@ def show_ui():
     focused_win_size = global_knowledge['wss'][global_knowledge['active']]['focused_win_size']
     if screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
         # Get screenshot aspect ratio and scale it to be a bit smaller than the workspaces thumb
-        ar = focused_win_size[0] / focused_win_size[1]
-        rh = int(tiles_inner_h/1.5)
-        rw = int(rh * ar)
+        ar = min(focused_win_size) / max(focused_win_size)
+        factor = 1.5
+        if focused_win_size[1] > focused_win_size[0]: 
+            rh = int(tiles_inner_h/factor)
+            rw = int(rh * ar)
+        else:
+            rw = int(tiles_inner_w/factor)
+            rh = int(rw * ar)
+        del factor
+
         rectangle = pygame.rect.Rect(\
             screen.get_width() - rw - int(pad_w/2), screen.get_height() - rh - int(pad_h/2), rw, rh)
         focused_win_thumb = pygame.transform.smoothscale(\
