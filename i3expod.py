@@ -283,21 +283,26 @@ def show_ui():
 
     grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
 
-    # Calculate grid size in a more efficient way taking into account orientation
+    # Calculate grid size in a more efficient way taking into account orientation:
+    # Vertical screens take about 1/3 of the horizontal size so we can fit more frames in a row.
+    # BUT the exact proportions (w / (h / (w / h))) can't be used because with any gap between frames 
+    # we can't really fit any more than two vertical frames, hence tmp += 1/2
     tmp = 0
     for num in global_knowledge["wss"].keys():
         w = global_knowledge["wss"][num]['size'][0]
         h = global_knowledge["wss"][num]['size'][1]
         a = 0
         if h > w:
-            tmp += (w / (h / (w / h) ))
+            # tmp += (w / (h / (w / h) ))  # exact
+            tmp += 1/2                     # any gap approximation
         else:
             tmp += 1
     for o in outputs:
         w = o.rect.width
         h = o.rect.height
         if h > w:
-            tmp += (w / (h / (w / h) ))
+            # tmp += (w / (h / (w / h) ))
+            tmp += 1/2
         else:
             tmp += 1
     grid_x = grid_y = math.ceil(math.sqrt(tmp))
