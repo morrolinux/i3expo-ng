@@ -604,21 +604,25 @@ def show_ui():
     row_idx = 0
 
     # Focused window thumb overlay to be dragged over to workspaces
+    focused_win_name = focused_win_id = focused_win_thumb = rectangle = None
     screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
     focused_win_size = global_knowledge['wss'][global_knowledge['active']]['focused_win_size']
-    rw = int(focused_win_size[0]/5) if focused_win_size is not None else 0
-    rh = int(focused_win_size[1]/5) if focused_win_size is not None else 0
-    rectangle = pygame.rect.Rect(screen.get_width() - rw - 50, screen.get_height() - rh - 50, rw, rh)
-    focused_win_thumb = pygame.transform.smoothscale(screenshot, (rectangle.width, rectangle.height))\
-            if screenshot is not None else None
+    if screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
+        # Get screenshot aspect ratio and scale it to be a bit smaller than the workspaces thumb
+        ar = focused_win_size[0] / focused_win_size[1]
+        rh = int(tiles_inner_h/1.5)
+        rw = int(rh * ar)
+        rectangle = pygame.rect.Rect(\
+            screen.get_width() - rw - int(pad_w/2), screen.get_height() - rh - int(pad_h/2), rw, rh)
+        focused_win_thumb = pygame.transform.smoothscale(\
+            screenshot, (rectangle.width, rectangle.height))\
 
-    focused_win_name = focused_win_id = None
-    with suppress(KeyError):
-        focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
-        focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
+        with suppress(KeyError):
+            focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
+            focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
 
-    # Precalculate and draw lightmask for focused window thumbnail
-    lightmask, lightmask_position = gen_active_win_overlay(rectangle)
+        # Precalculate and draw lightmask for focused window thumbnail
+        lightmask, lightmask_position = gen_active_win_overlay(rectangle)
 
     # Draw grid and focused window thumbnail overlay border
     draw_grid()
@@ -685,7 +689,7 @@ def show_ui():
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    if rectangle.collidepoint(event.pos):
+                    if rectangle is not None and rectangle.collidepoint(event.pos):
                         rectangle_dragging = True
                         mouse_x, mouse_y = event.pos
                         offset_x = rectangle.x - mouse_x
@@ -750,7 +754,7 @@ def show_ui():
                 screen.blit(frames[active_frame]['mouseondrag'], frames[active_frame]['ul'])
             frames[active_frame]['active'] = True
 
-        if rectangle_dragging or grid_dirty_flag:
+        if (rectangle_dragging or grid_dirty_flag) and rectangle is not None:
             grid_dirty_flag = False
             lightmask, lightmask_position = gen_active_win_overlay(rectangle)
             # DRAW active window border overlay
