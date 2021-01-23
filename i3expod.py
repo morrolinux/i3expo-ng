@@ -77,8 +77,8 @@ def signal_show(signal, frame):
         primary_output_name = output.split()[0].decode()
 
         # Get the visible workspace on the primary monitor
-        visible_ws_primary = [w.ipc_data['num'] for w in i3.get_workspaces() \
-            if w.ipc_data['visible'] == True and w.ipc_data['output'] == primary_output_name][0]
+        visible_ws_primary = [w.num for w in i3.get_workspaces() \
+            if w.visible == True and w.output == primary_output_name][0]
 
         global_knowledge['visible_ws_primary'] = visible_ws_primary
 
@@ -204,9 +204,15 @@ def update_workspace(workspace, screenshot=None):
         }
 
     global_knowledge["wss"][workspace.num]['size'] =\
-            (workspace.ipc_data['rect']['width'], workspace.ipc_data['rect']['height'])
+            (workspace.rect.width, workspace.rect.height)
     global_knowledge["wss"][workspace.num]['name'] = workspace.name
-    global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
+
+    # Retrocompatibility
+    if hasattr(workspace, 'ipc_data') and 'output' in workspace.ipc_data.keys():
+        global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
+    elif hasattr(workspace, "output"):
+        global_knowledge["wss"][workspace.num]['output'] = workspace.output
+
     global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     global_knowledge["active"] = workspace.num
 
