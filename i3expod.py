@@ -733,8 +733,15 @@ def show_ui():
         if move_win:
             if focused_win_id is None:
                 break
-            cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name']
+
+            # Move active container to selected workspace (using name if it already exists, number if it is to be created)
+            if active_frame in global_knowledge["wss"].keys():
+                cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name']
+            else:
+                cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
+
             i3.command(cmd)
+
         if jump:
             cmd = ""
             # Create a new empty workspace on the requested output
@@ -742,12 +749,14 @@ def show_ui():
                 cmd += "workspace " + str(active_frame) + ";"
                 cmd += 'move workspace to output ' + \
                     new_wss_output[active_frame].name + ';'
+
             # Jump back to the visible ws on primary output to preserve back_and_forth behaviour
             cmd += 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
+
             # Jumpt to the requested workspace (by its name if already exists, by its number if it's created anew)
-            try:
+            if active_frame in global_knowledge["wss"].keys():
                 cmd += 'workspace ' + global_knowledge["wss"][active_frame]['name']
-            except KeyError:
+            else:
                 cmd += 'workspace ' + str(active_frame)
 
             i3.command(cmd)
