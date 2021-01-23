@@ -211,8 +211,6 @@ def update_workspace(workspace, screenshot=None):
     # Retrocompatibility
     if hasattr(workspace, 'ipc_data') and 'output' in workspace.ipc_data.keys():
         global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
-    elif hasattr(workspace, "output"):
-        global_knowledge["wss"][workspace.num]['output'] = workspace.output
 
     global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     global_knowledge["active"] = workspace.num
