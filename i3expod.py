@@ -53,9 +53,11 @@ def signal_reload(signal, frame):
 
 def signal_show(signal, frame):
     global global_updates_running
+    # toggles expo view
     if not global_updates_running:
         global_updates_running = True
     else:
+        global_updates_running = False
         focused_win = i3.get_tree().find_focused()
         win_w = focused_win.rect.width
         win_h = focused_win.rect.height
@@ -82,7 +84,6 @@ def signal_show(signal, frame):
 
         global_knowledge['visible_ws_primary'] = visible_ws_primary
 
-        global_updates_running = False
         i3.command('workspace ' + global_knowledge["wss"][visible_ws_primary]['name'] + '; workspace i3expod-temporary-workspace')
         # i3.command('workspace ' + visible_ws_primary)
         # i3.command('workspace i3expod-temporary-workspace')
@@ -254,6 +255,7 @@ def update_state(i3, e):
     workspace_x = current_workspace.rect.x
     workspace_y = current_workspace.rect.y
 
+    # print("update_state", current_workspace.name)
     screenshot = grab_screen(x=workspace_x, y=workspace_y, w=workspace_width, h=workspace_height)
 
     update_workspace(current_workspace, screenshot)
@@ -736,20 +738,19 @@ def show_ui():
 
             last_active_frame = active_frame
 
+        cmd = ""
+
         if move_win:
             if focused_win_id is None:
                 break
 
             # Move active container to selected workspace (using name if it already exists, number if it is to be created)
             if active_frame in global_knowledge["wss"].keys():
-                cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name']
+                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name'] + ";"
             else:
-                cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
-
-            i3.command(cmd)
+                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame) + ";"
 
         if jump:
-            cmd = ""
             # Create a new empty workspace on the requested output
             if active_frame not in global_knowledge["wss"].keys():
                 cmd += "workspace " + str(active_frame) + ";"
@@ -764,8 +765,6 @@ def show_ui():
                 cmd += 'workspace ' + global_knowledge["wss"][active_frame]['name']
             else:
                 cmd += 'workspace ' + str(active_frame)
-
-            i3.command(cmd)
             break
 
         # DRAW mouseoff, mouseon, mouseondrag overlays
@@ -798,8 +797,9 @@ def show_ui():
     global_updates_running = True
 
     if not jump:
-        i3.command('workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';')
+        cmd = 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
 
+    i3.command(cmd)
 
 if __name__ == '__main__':
 
