@@ -49,7 +49,7 @@ Compile the `prtscn.c` as follows:
 Put the `prtscn.so` in the same directory as the Python script (or adjust the
 location in the code).
 
-Put `defaultconfig` into `$XDG_CONFIG_DIR/i3expo/config`.
+Copy `defaultconfig` into `~/.config/i3expo/config`.
 Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 
 Add this to your `i3` config
