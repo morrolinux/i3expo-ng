@@ -83,7 +83,7 @@ def signal_show(signal, frame):
         global_knowledge['visible_ws_primary'] = visible_ws_primary
 
         global_updates_running = False
-        i3.command('workspace ' + str(visible_ws_primary) + '; workspace i3expod-temporary-workspace')
+        i3.command('workspace ' + global_knowledge["wss"][visible_ws_primary]['name'] + '; workspace i3expod-temporary-workspace')
         # i3.command('workspace ' + visible_ws_primary)
         # i3.command('workspace i3expod-temporary-workspace')
 
@@ -733,7 +733,7 @@ def show_ui():
         if move_win:
             if focused_win_id is None:
                 break
-            cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame)
+            cmd = '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name']
             i3.command(cmd)
         if jump:
             cmd = ""
@@ -743,8 +743,13 @@ def show_ui():
                 cmd += 'move workspace to output ' + \
                     new_wss_output[active_frame].name + ';'
             # Jump back to the visible ws on primary output to preserve back_and_forth behaviour
-            cmd += 'workspace ' + str(global_knowledge['visible_ws_primary']) + ';'
-            cmd += 'workspace ' + str(active_frame)
+            cmd += 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
+            # Jumpt to the requested workspace (by its name if already exists, by its number if it's created anew)
+            try:
+                cmd += 'workspace ' + global_knowledge["wss"][active_frame]['name']
+            except KeyError:
+                cmd += 'workspace ' + str(active_frame)
+
             i3.command(cmd)
             break
 
@@ -778,8 +783,7 @@ def show_ui():
     global_updates_running = True
 
     if not jump:
-        # i3.command('workspace ' + str(global_knowledge["active"]))
-        i3.command('workspace ' + str(global_knowledge['visible_ws_primary']) + ';')
+        i3.command('workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';')
 
 
 if __name__ == '__main__':
