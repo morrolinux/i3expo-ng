@@ -57,6 +57,7 @@ def signal_show(signal, frame):
     if not global_updates_running:
         global_updates_running = True
     else:
+        update_state(i3, None)  # for a <1s updated screenshot of the primary ws upon calling
         global_updates_running = False
         focused_win = i3.get_tree().find_focused()
         win_w = focused_win.rect.width
@@ -227,11 +228,13 @@ last_update = 0
 def update_state(i3, e):
     global last_update
 
+    time_delta = time.time() - last_update
+
     if not global_updates_running:
         return False
-    if time.time() - last_update < 0.1:
+    if time_delta < 0.2:  # This should be >= your compositor fade time
+        # print("time_delta: {}. not updating to avoid flood".format(time_delta))
         return False
-    last_update = time.time()
 
     root = i3.get_tree()
     window = root.find_focused()
@@ -253,11 +256,13 @@ def update_state(i3, e):
     workspace_x = current_workspace.rect.x
     workspace_y = current_workspace.rect.y
 
-    # print("update_state", current_workspace.name)
     screenshot = grab_screen(x=workspace_x, y=workspace_y, w=workspace_width, h=workspace_height)
-
     update_workspace(current_workspace, screenshot)
-    #time.sleep(0.5)
+
+    # print(time_delta, "update_state [{}]".format(current_workspace.name), \
+    #     e.ipc_data if e is not None else None)
+
+    reset_update_timer(i3, e)
 
 
 def get_hovered_frame(mpos, frames):
@@ -792,12 +797,20 @@ def show_ui():
 
     pygame.display.quit()
     pygame.display.init()
-    global_updates_running = True
 
     if not jump:
         cmd = 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
 
     i3.command(cmd)
+
+    # Unlock the global updates
+    global_updates_running = True
+
+
+def reset_update_timer(i3, e):
+    global last_update
+    last_update = time.time()   
+
 
 if __name__ == '__main__':
 
@@ -810,7 +823,12 @@ if __name__ == '__main__':
     i3.on('window::move', update_state)
     i3.on('window::floating', update_state)
     i3.on('window::fullscreen_mode', update_state)
-    # i3.on('workspace', update_state)
+    # i3.on('window::focus', update_state)
+
+    # Reset time counter so that the update thread does not take a screenshot 
+    # while transitioning from one workspace to another, resulting in a dirty screenshot
+    # if you use a compositor with fading enabled
+    i3.on('workspace', reset_update_timer)
 
     i3_thread = Thread(target = i3.main)
     i3_thread.daemon = True
