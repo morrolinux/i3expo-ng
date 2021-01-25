@@ -55,7 +55,7 @@ Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 Add this to your `i3` config
 `exec_always "~/i3expo-ng/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
 
-`-f` is for fullscreen 
+`-f` is for fullscreen (causes pygame to crash on a black screen on some distros)
 
 `-w` is for wallpaper. Should match your i3 wallpaper
 
@@ -68,6 +68,11 @@ to have the application reload its configuration.
 
 Navigate the UI with the mouse or with they keyboard using `hjkl`, the arrow
 keys, Return and Escape.
+
+# Known issues
+
+On some distros (or hardware? has to be investigated more) fullscreen mode will crash pygame on a black screen.
+Simple workaround is to remove `-f` flag and use the program windowed
 
 # Limitations
 
