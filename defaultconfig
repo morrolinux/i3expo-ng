@@ -2,10 +2,10 @@
 
 bgcolor = None
 
-padding_percent_x = 5 
-padding_percent_y = 5 
-spacing_percent_x = 5 
-spacing_percent_y = 5 
+padding_percent_x = 2
+padding_percent_y = 3
+spacing_percent_x = 2
+spacing_percent_y = 3
 
 frame_width_px = None
 frame_active_color = None
@@ -20,10 +20,10 @@ tile_unknown_color = None
 tile_empty_color = None
 tile_nonexistant_color = None
 
+names_show = None
 names_font = None
 names_fontsize = None
 names_color = None
 
-thumb_stretch = None
 highlight_percentage = None
 
