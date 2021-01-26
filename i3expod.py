@@ -286,13 +286,11 @@ def show_ui():
 
     clock = pygame.time.Clock()
 
-    workspaces = len(global_knowledge["wss"])
+    workspaces = global_knowledge["wss"]
     outputs = global_knowledge["outputs"]
 
     # Get primary monitor size
     monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-
-    grid_x = grid_y = math.ceil(math.sqrt(workspaces + len(outputs)))
 
     # Calculate grid size in a more efficient way taking into account orientation:
     # Vertical screens take about 1/3 of the horizontal size so we can fit more frames in a row.
@@ -316,8 +314,9 @@ def show_ui():
             tmp += 1/2
         else:
             tmp += 1
+
     grid_x = grid_y = math.ceil(math.sqrt(tmp))
-    grid_size = math.ceil(math.sqrt(workspaces + len(outputs)))
+    grid_size = math.ceil(math.sqrt(len(workspaces) + len(outputs)))
     # print("GRID SIZE: {} x {} ".format(grid_size, grid_size), "EFFICIENT SIZE: {} x {}".format(grid_x, grid_y))
 
     frame_thickness = get_config('UI', 'frame_width_px')
