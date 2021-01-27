@@ -14,10 +14,13 @@ import pprint
 import time
 import argparse
 import random
+import subprocess
+import math
 from threading import Thread
 from PIL import Image, ImageDraw
 from xdg.BaseDirectory import xdg_config_home
-
+from contextlib import suppress
+from PIL import Image, ImageFilter, ImageEnhance
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
@@ -30,7 +33,10 @@ args = parser.parse_args()
 
 pp = pprint.PrettyPrinter(indent=4)
 
+YELLOW = (255, 255, 0)
+
 global_updates_running = True
+last_update = 0
 global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary': None, 'out_aliases': {}}
 
 pygame.display.init()
@@ -59,40 +65,37 @@ def signal_show(signal, frame):
     else:
         update_state(i3, None)  # for a <1s updated screenshot of the primary ws upon calling
         global_updates_running = False
+
+        # Take a screenshot of the focused window for the window drag overlay
         focused_win = i3.get_tree().find_focused()
-        win_w = focused_win.rect.width
-        win_h = focused_win.rect.height
-        win_x = focused_win.rect.x
-        win_y = focused_win.rect.y
-        win_name = focused_win.name
-        win_id = focused_win.id
-        win_size = (focused_win.window_rect.width, focused_win.window_rect.height)
-        screenshot = grab_screen(x=win_x, y=win_y, w=win_w, h=win_h)
+        screenshot = grab_screen(x=focused_win.rect.x, y=focused_win.rect.y,
+                                 w=focused_win.rect.width, h=focused_win.rect.height)
         global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot'] = screenshot
-        global_knowledge['wss'][global_knowledge['active']]['focused_win_name'] = win_name
-        global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = win_id
-        global_knowledge['wss'][global_knowledge['active']]['focused_win_size'] = win_size
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_name'] = focused_win.name
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = focused_win.id
+        global_knowledge['wss'][global_knowledge['active']]['focused_win_size'] = \
+            (focused_win.window_rect.width, focused_win.window_rect.height )
 
-        # Get primary monitor name
-        import subprocess
-        output = subprocess.Popen('xrandr | grep "primary" | cut -d" " -f1', \
-            shell=True, stdout=subprocess.PIPE).communicate()[0]
-        primary_output_name = output.split()[0].decode()
+        # Open the expo view on the primary output:
+        # 1) Get primary monitor name
+        primary_output_name = subprocess.Popen('xrandr | grep "primary" | cut -d" " -f1',
+                                               shell=True, stdout=subprocess.PIPE).communicate()[0].split()[0].decode()
 
-        # Get the visible workspace on the primary monitor
-        visible_ws_primary = [w.num for w in i3.get_workspaces() \
-            if w.visible == True and w.output == primary_output_name][0]
-
+        # 2) Get the visible workspace on the primary monitor
+        visible_ws_primary = [w.num for w in i3.get_workspaces()
+                              if w.visible == True and w.output == primary_output_name][0]
         global_knowledge['visible_ws_primary'] = visible_ws_primary
 
-        i3.command('workspace ' + global_knowledge["wss"][visible_ws_primary]['name'] + '; workspace i3expod-temporary-workspace')
-        # i3.command('workspace ' + visible_ws_primary)
-        # i3.command('workspace i3expod-temporary-workspace')
+        # 3) First move to the active ws on the primary output, then create a temporary workspace for the expo view
+        i3.command('workspace ' + global_knowledge["wss"][visible_ws_primary]['name'] +
+                   '; workspace i3expod-temporary-workspace')
 
+        # 4) And start the UI thread
         ui_thread = Thread(target = show_ui)
         ui_thread.daemon = True
         ui_thread.start()
 
+# Bind signals
 signal.signal(signal.SIGINT, signal_quit)
 signal.signal(signal.SIGTERM, signal_quit)
 signal.signal(signal.SIGHUP, signal_reload)
@@ -133,9 +136,6 @@ def get_color(section = None, option = None, raw = None):
             pass
 
     raise ValueError
-  
-    #except Exception as e:
-    #    print traceback.format_exc()
 
 defaults = {
         ('UI', 'bgcolor'): (get_color, get_color(raw = 'gray20')),
@@ -147,12 +147,10 @@ defaults = {
         ('UI', 'frame_active_color'): (get_color, get_color(raw = '#3b4f8a')),
         ('UI', 'frame_inactive_color'): (get_color, get_color(raw = '#43747b')),
         ('UI', 'frame_unknown_color'): (get_color, get_color(raw = '#c8986b')),
-        ('UI', 'frame_empty_color'): (get_color, get_color(raw = 'gray60')),
         ('UI', 'frame_nonexistant_color'): (get_color, get_color(raw = 'gray30')),
         ('UI', 'tile_active_color'): (get_color, get_color(raw = '#5a6da4')),
         ('UI', 'tile_inactive_color'): (get_color, get_color(raw = '#93afb3')),
         ('UI', 'tile_unknown_color'): (get_color, get_color(raw = '#ffe6d0')),
-        ('UI', 'tile_empty_color'): (get_color, get_color(raw = 'gray80')),
         ('UI', 'tile_nonexistant_color'): (get_color, get_color(raw = 'gray40')),
         ('UI', 'names_font'): (config.get, 'sans-serif'),
         ('UI', 'names_fontsize'): (config.getint, 25),
@@ -165,9 +163,10 @@ def read_config():
     # Read custom labels for output names (if any)
     for key in config['OUTPUT_ALIASES']:
         global_knowledge['out_aliases'][key] = config['OUTPUT_ALIASES'][key]
+    # Read and override default config if != None
     for option in defaults.keys():
         if not isset(option):
-            if defaults[option][1] == None:
+            if defaults[option][1] is None:
                 print("Error: Mandatory option " + str(option) + " not set!")
                 sys.exit(1)
             config.set(*option, value=defaults[option][1])
@@ -185,7 +184,7 @@ def isset(option):
 
 def grab_screen(x=None, y=None, w=None, h=None):
     size = w * h
-    objlength = size * 3
+    objlength = size * 3    # RGB has 3 channels... (R, G, B)
 
     grab.getScreen.argtypes = []
     result = (ctypes.c_ubyte*objlength)()
@@ -208,15 +207,12 @@ def update_workspace(workspace, screenshot=None):
                 'focused_win_size': None
         }
 
-    global_knowledge["wss"][workspace.num]['size'] =\
-            (workspace.rect.width, workspace.rect.height)
+    global_knowledge["wss"][workspace.num]['size'] = (workspace.rect.width, workspace.rect.height)
     global_knowledge["wss"][workspace.num]['name'] = workspace.name
-
-    # Retrocompatibility
+    global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     if hasattr(workspace, 'ipc_data') and 'output' in workspace.ipc_data.keys():
         global_knowledge["wss"][workspace.num]['output'] = workspace.ipc_data['output']
 
-    global_knowledge["wss"][workspace.num]['screenshot'] = screenshot
     global_knowledge["active"] = workspace.num
 
 def init_knowledge():
@@ -226,8 +222,6 @@ def init_knowledge():
     # all outputs but the virtual ones
     global_knowledge["outputs"] = [o for o in i3.get_outputs() if o.name.find('xroot') < 0]
 
-last_update = 0
-
 def update_state(i3, e):
     global last_update
 
@@ -236,63 +230,59 @@ def update_state(i3, e):
     if not global_updates_running:
         return False
     if time_delta < 0.2:  # This should be >= your compositor fade time
-        # print("time_delta: {}. not updating to avoid flood".format(time_delta))
         return False
 
     root = i3.get_tree()
     window = root.find_focused()
     current_workspace = window.workspace()
 
-    # remove leftover desktops
+    # Remove leftover desktops
     i3_active_wss = root.workspaces()
     deleted = []
     for num in global_knowledge["wss"].keys():
         if num not in [w.num for w in i3_active_wss]:
             deleted.append(num)
-    deleted.sort() # make sure we're deleting the right items while iterating
+    deleted.sort()  # make sure we're deleting the right items while iterating
     deleted.reverse()
     for num in deleted:
         del(global_knowledge["wss"][num])
 
-    workspace_width = current_workspace.rect.width
-    workspace_height = current_workspace.rect.height
-    workspace_x = current_workspace.rect.x
-    workspace_y = current_workspace.rect.y
-
-    screenshot = grab_screen(x=workspace_x, y=workspace_y, w=workspace_width, h=workspace_height)
+    # Take a screenshot and update the active workspace
+    screenshot = grab_screen(x=current_workspace.rect.x, y=current_workspace.rect.y,
+                             w=current_workspace.rect.width, h=current_workspace.rect.height)
     update_workspace(current_workspace, screenshot)
 
-    # print(time_delta, "update_state [{}]".format(current_workspace.name), \
-    #     e.ipc_data if e is not None else None)
-
+    # Make sure this function isn't called too frequently
     reset_update_timer(i3, e)
-
 
 def get_hovered_frame(mpos, frames):
     for frame in frames.keys():
-        if mpos[0] > frames[frame]['ul'][0] \
-                and mpos[0] < frames[frame]['br'][0] \
-                and mpos[1] > frames[frame]['ul'][1] \
-                and mpos[1] < frames[frame]['br'][1]:
+        if frames[frame]['ul'][0] < mpos[0] < frames[frame]['br'][0] \
+                and frames[frame]['ul'][1] < mpos[1] < frames[frame]['br'][1]:
             return frame
     return None
 
+def gen_active_win_overlay(rectangle, alpha=255):
+    # Calculate active border overlay
+    win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
+    win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
+    lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad),
+            pygame.SRCALPHA, 32).convert_alpha()
+    lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
+    lightmask.fill(YELLOW + (alpha,))
+    return lightmask, lightmask_position
 
 def show_ui():
     global global_updates_running
-    import math
-    from contextlib import suppress
-    from PIL import Image, ImageFilter, ImageEnhance
 
     FPS = 60
-    YELLOW = (255, 255, 0) 
 
     clock = pygame.time.Clock()
 
     workspaces = global_knowledge["wss"]
     outputs = global_knowledge["outputs"]
 
-    # Get primary monitor size
+    # Get monitor size
     monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
 
     # Calculate grid size in a more efficient way taking into account orientation:
@@ -327,13 +317,11 @@ def show_ui():
     frame_active_color = get_config('UI', 'frame_active_color')
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
     frame_unknown_color = get_config('UI', 'frame_unknown_color')
-    frame_empty_color = get_config('UI', 'frame_empty_color')
     frame_nonexistant_color = get_config('UI', 'frame_nonexistant_color')
     
     tile_active_color = get_config('UI', 'bgcolor')
     tile_inactive_color = get_config('UI', 'bgcolor')
     tile_unknown_color = get_config('UI', 'tile_unknown_color')
-    tile_empty_color = get_config('UI', 'tile_empty_color')
     tile_nonexistant_color = get_config('UI', 'tile_nonexistant_color')
     
     names_font = get_config('UI', 'names_font')
@@ -351,8 +339,6 @@ def show_ui():
     # Usable screen space (if windowed it won't match monitor_size)
     screen_w = screen.get_width()
     screen_h = screen.get_height()
-    # screen_w = monitor_size[0]
-    # screen_h = monitor_size[1]
 
     # Padding/margin for tiles
     pad_w = round(screen_w * get_config('UI', 'padding_percent_x') / 100)
@@ -365,7 +351,7 @@ def show_ui():
     # Outer and inner tiles size (draw outer then inner to get the frame)
     tiles_outer_w = round((screen_w - 2 * pad_w - tiles_gap_w * (grid_x - 1)) / grid_x)
     tiles_outer_h = round((screen_h - 2 * pad_h - tiles_gap_h * (grid_y - 1)) / grid_y)
-    tiles_inner_w = tiles_outer_w - 2 * frame_thickness 
+    tiles_inner_w = tiles_outer_w - 2 * frame_thickness
     tiles_inner_h = tiles_outer_h - 2 * frame_thickness
 
     # Gap between frames
@@ -386,7 +372,6 @@ def show_ui():
     # if a wallpaper was specified, use that as a background for thumb_new
     if args.wp is not None:
         if 'wp_img' not in global_knowledge['ui_cache'].keys():
-            wp_img = pygame.image.load(args.wp)
             im = Image.open(args.wp)
             en = ImageEnhance.Brightness(im)
             wp_img = en.enhance(0.4)
@@ -398,7 +383,7 @@ def show_ui():
         wp_img = global_knowledge['ui_cache']['wp_img']
         thumb_new.blit(wp_img, (0, 0))
 
-    thumb_new.blit(plss, (origin_x, origin_y))
+    thumb_new.blit(plss, (origin_x, origin_y))  # Then draw the + sign
 
     font = pygame.font.SysFont(names_font, names_fontsize)
 
@@ -406,24 +391,21 @@ def show_ui():
     wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
     # Sort workspace indexes by aspect ratio (landscape then portrait)
     wss_idx.sort(key=lambda x: global_knowledge['wss'][x]['size'][1])
-    # wss_idx.sort()
 
-    # Generate one new/empty ws for each display output available
+    # Generate one new/empty ws for each display output available:
+    new_wss_output = {}
+    tmp = []
     if args.mode == "sequential":
         r = max(1000, wss_idx[-1])  # or r = 1000
     elif args.mode == "filler":
         r = 1
-
-    new_wss_output = {}
-    tmp = []
     for out in outputs:
         while r in wss_idx + tmp:
             r += 1
         new_wss_output[r] = out
         tmp.append(r)
 
-    # Sort NEW workspace indexes by aspect ratio (landscape then portrait)
-    # and append them to the list of workspaces
+    # Sort NEW workspace indexes by aspect ratio (portrait then landscape) and append them to the list of workspaces
     tmp.sort(key=lambda x: new_wss_output[x].rect.width)
     wss_idx.extend(tmp)
     del tmp
@@ -443,47 +425,28 @@ def show_ui():
             'br': (0, 0)} 
     frames = {i: frame_template.copy() for i in wss_idx}
 
-    def gen_active_win_overlay(rectangle, alpha=255):
-        # Calculate active border overlay
-        win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
-        win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
-        lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad), 
-                pygame.SRCALPHA, 32).convert_alpha()
-        lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
-        lightmask.fill(YELLOW + (alpha,))
-        return lightmask, lightmask_position
-
     def draw_grid():
-        wss_idx_todo = wss_idx.copy()
-        wsi = 0
         screen.fill(get_config('UI', 'bgcolor'))
-        for y in range(grid_y):
-            last_x = 0
-            for x in range(grid_x * grid_x):
-                # This is the stop condition because the grid cardinality 
-                # will often be higher than the number of thumbs
-                if wsi >= len(wss_idx):
-                    break
+        wss_idx_todo = wss_idx.copy()
 
+        for y in range(grid_y):
+            tile_last_x = 0
+            for x in range(grid_x * grid_x):
                 # Origin point for next tile will be after the last one on this row
-                if last_x == 0:
-                    origin_x = pad_w 
-                else:
-                    origin_x = last_x + tiles_gap_w
-                origin_y = pad_h + frames_gap_h * y
+                tile_origin_x = tile_last_x + tiles_gap_w if tile_last_x != 0 else pad_w
+                tile_origin_y = pad_h + frames_gap_h * y
 
                 # Extract the next workspace index and place it on the matrix
                 index = None
                 for i, idx in enumerate(wss_idx_todo):
                     tiles_outer_w_dyn = tiles_outer_w
                     tiles_inner_w_dyn = tiles_inner_w
+
                     # Is it an existing ws or a new one to be created?
-                    if idx in global_knowledge["wss"].keys():
-                        ws_width = global_knowledge["wss"][idx]['size'][0]
-                        ws_height = global_knowledge["wss"][idx]['size'][1]
-                    else:
-                        ws_width = new_wss_output[idx].rect.width
-                        ws_height = new_wss_output[idx].rect.height
+                    ws_width = global_knowledge["wss"][idx]['size'][0] if idx in global_knowledge["wss"].keys() \
+                        else new_wss_output[idx].rect.width
+                    ws_height = global_knowledge["wss"][idx]['size'][1] if idx in global_knowledge["wss"].keys() \
+                        else new_wss_output[idx].rect.height
 
                     # Resize frame width for vertical workspaces
                     if ws_height > ws_width:
@@ -492,8 +455,7 @@ def show_ui():
                         tiles_inner_w_dyn = tiles_outer_w_dyn - 2 * frame_thickness
 
                     # If it fits on the row, place it and remove its index from the todo list
-                    if origin_x + tiles_outer_w_dyn <= screen_w - pad_w:
-                        # print("Adding", idx, tiles_inner_w_dyn, tiles_outer_w_dyn)
+                    if tile_origin_x + tiles_outer_w_dyn <= screen_w - pad_w:
                         index = idx
                         del wss_idx_todo[i]
                         break
@@ -501,11 +463,10 @@ def show_ui():
                 if index is None:
                     break
 
-                frames[index]['ul'] = (origin_x, origin_y)
+                tile_last_x = tile_origin_x + tiles_outer_w_dyn
                 kbd_grid[y][x] = index
-                last_x = origin_x + tiles_outer_w_dyn 
-                frames[index]['br'] = (origin_x + tiles_outer_w_dyn, origin_y + tiles_outer_h)
-                wsi += 1 # TODO: do I still need this?
+                frames[index]['ul'] = (tile_origin_x, tile_origin_y)
+                frames[index]['br'] = (tile_origin_x + tiles_outer_w_dyn, tile_origin_y + tiles_outer_h)
 
                 # Different properties for different kinds of thumbnails
                 if global_knowledge['active'] == index:
@@ -526,32 +487,19 @@ def show_ui():
                     frame_color = frame_nonexistant_color
                     image = thumb_new
 
-                # Draw frame and tile
-                screen.fill(frame_color,
-                        (
-                            origin_x,
-                            origin_y,
-                            tiles_outer_w_dyn,
-                            tiles_outer_h,
-                        ))
-
-                screen.fill(tile_color,
-                        (
-                            origin_x + frame_thickness,
-                            origin_y + frame_thickness,
-                            tiles_inner_w_dyn,
-                            tiles_inner_h,
-                        ))
+                # Draw frame
+                screen.fill(frame_color, (tile_origin_x, tile_origin_y, tiles_outer_w_dyn, tiles_outer_h,))
+                # Draw tile
+                screen.fill(tile_color, (tile_origin_x + frame_thickness, tile_origin_y + frame_thickness,
+                                         tiles_inner_w_dyn, tiles_inner_h,))
 
                 # Calculate thumbnail placement and size
-                image_size = image.get_rect().size
-                image_x = image_size[0]
-                image_y = image_size[1]
+                image_w = image.get_rect().size[0]
+                image_h = image.get_rect().size[1]
                 crop = None
 
-                # print("frame {}. Scaling image...".format(index))
-                # print(image_x, image_y, tiles_inner_w_dyn, tiles_inner_h)
-                if image_x > image_y and tiles_inner_w_dyn < tiles_inner_h:
+                # Resize / crop the image to fit the tile
+                if image_w > image_h and tiles_inner_w_dyn < tiles_inner_h:
                     result_x = tiles_inner_w
                     result_y = tiles_inner_h
                     offset_x = round((tiles_inner_w - result_x) / 2)
@@ -571,11 +519,12 @@ def show_ui():
                     thumb_cache[index] = image
 
                 # DRAW the screenshot as a thumbnail
-                screen.blit(image, (origin_x + frame_thickness + offset_x, origin_y + frame_thickness + offset_y), crop)
+                screen.blit(image, (tile_origin_x + frame_thickness + offset_x,
+                                    tile_origin_y + frame_thickness + offset_y), crop)
 
                 # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
-                    mouseoff = screen.subsurface((origin_x, origin_y, tiles_outer_w_dyn, tiles_outer_h)).copy()
+                    mouseoff = screen.subsurface((tile_origin_x, tile_origin_y, tiles_outer_w_dyn, tiles_outer_h)).copy()
                     lightmask = pygame.Surface((tiles_outer_w_dyn, tiles_outer_h), pygame.SRCALPHA, 32)
                     lightmask.convert_alpha()
                     lightmask_drag = lightmask.copy()
@@ -601,12 +550,12 @@ def show_ui():
                     if name.lower() in global_knowledge['out_aliases'].keys():
                         name = global_knowledge['out_aliases'][name.lower()]
 
+                # Draw the caption
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
-                name_x = origin_x + round((tiles_outer_w_dyn- name_width) / 2)
-                name_y = origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
+                name_x = tile_origin_x + round((tiles_outer_w_dyn- name_width) / 2)
+                name_y = tile_origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
                 screen.blit(name, (name_x, name_y))
-
 
     pygame.display.flip()
 
@@ -623,11 +572,12 @@ def show_ui():
     row_idx = 0
 
     # Focused window thumb overlay to be dragged over to workspaces
-    focused_win_name = focused_win_id = focused_win_thumb = rectangle = None
-    screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
+    focused_win_screenshot = global_knowledge['wss'][global_knowledge['active']]['focused_win_screenshot']
     focused_win_size = global_knowledge['wss'][global_knowledge['active']]['focused_win_size']
-    if screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
-        # Get screenshot aspect ratio and scale it to be a bit smaller than the workspaces thumb
+
+    # Get screenshot aspect ratio and scale it to be a bit smaller than the workspaces thumb
+    focused_win_thumb = None
+    if focused_win_screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
         ar = min(focused_win_size) / max(focused_win_size)
         factor = 1.5
         if focused_win_size[1] > focused_win_size[0]: 
@@ -638,21 +588,20 @@ def show_ui():
             rh = int(rw * ar)
         del factor
 
-        rectangle = pygame.rect.Rect(\
-            screen.get_width() - rw - int(pad_w/2), screen.get_height() - rh - int(pad_h/2), rw, rh)
-        focused_win_thumb = pygame.transform.smoothscale(\
-            screenshot, (rectangle.width, rectangle.height))\
+        rectangle = pygame.rect.Rect(screen.get_width() - rw - int(pad_w/2),
+                                     screen.get_height() - rh - int(pad_h/2),
+                                     rw,
+                                     rh)
+
+        focused_win_thumb = pygame.transform.smoothscale(focused_win_screenshot, (rectangle.width, rectangle.height))
 
         with suppress(KeyError):
-            focused_win_name = global_knowledge['wss'][global_knowledge['active']]['focused_win_name']
             focused_win_id = global_knowledge['wss'][global_knowledge['active']]['focused_win_id']
 
-        # Precalculate and draw lightmask for focused window thumbnail
-        lightmask, lightmask_position = gen_active_win_overlay(rectangle)
-
-    # Draw grid and focused window thumbnail overlay border
+    # Draw grid
     draw_grid()
 
+    # Draw focused window thumbnail overlay border
     if focused_win_thumb is not None:
         lightmask, lightmask_position = gen_active_win_overlay(rectangle, alpha=0)
         screen.blit(lightmask, lightmask_position)
@@ -666,7 +615,8 @@ def show_ui():
             screen.blit(f, rectangle) 
             pygame.display.flip()
             clock.tick(FPS)
-            
+
+    # Main loop: redraw screen and check status
     while running and not global_updates_running and pygame.display.get_init():
 
         # Avoid trailing effect when dragging the focused window preview over a workspace
@@ -676,7 +626,9 @@ def show_ui():
         jump = False
         move_win = False
         kbdmove = (0, 0)
+        cmd = ""
 
+        # Check for user interaction (via keyboard or mouse)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -728,9 +680,6 @@ def show_ui():
             active_frame = af if af is not None else last_active_frame
             last_active_frame = active_frame
         elif kbdmove != (0, 0):
-            if active_frame == None:
-                active_frame = kbd_grid[row_idx][col_idx]
-
             if kbdmove[0] != 0:
                 tmp = col_idx + kbdmove[0]
                 col_idx = tmp if tmp < len(kbd_grid[0]) else col_idx
@@ -745,33 +694,32 @@ def show_ui():
             if active_frame < 0:
                 row_idx = col_idx = 0
                 active_frame = kbd_grid[row_idx][col_idx]
-                last_active_frame = active_frame
 
             last_active_frame = active_frame
 
-        cmd = ""
-
+        # If the active window is moved to a workspace
         if move_win:
-            if focused_win_id is None:
-                break
+            if focused_win_id is None: break
 
-            # Move active container to selected workspace (using name if it already exists, number if it is to be created)
+            # Move active container to selected workspace (name if it already exists, number if it is to be created)
             if active_frame in global_knowledge["wss"].keys():
-                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + global_knowledge["wss"][active_frame]['name'] + ";"
+                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + \
+                       global_knowledge["wss"][active_frame]['name'] + ";"
             else:
-                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + str(active_frame) + ";"
+                cmd += '[con_id=\"' + str(focused_win_id) + '\"] move container to workspace ' + \
+                       str(active_frame) + ";"
 
+        # If the user release left click on a workspace, jump to it
         if jump:
             # Create a new empty workspace on the requested output
             if active_frame not in global_knowledge["wss"].keys():
                 cmd += "workspace " + str(active_frame) + ";"
-                cmd += 'move workspace to output ' + \
-                    new_wss_output[active_frame].name + ';'
+                cmd += 'move workspace to output ' + new_wss_output[active_frame].name + ';'
 
             # Jump back to the visible ws on primary output to preserve back_and_forth behaviour
             cmd += 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
 
-            # Jumpt to the requested workspace (by its name if already exists, by its number if it's created anew)
+            # Jump to the requested workspace (by its name if already exists, by its number if it's created anew)
             if active_frame in global_knowledge["wss"].keys():
                 cmd += 'workspace ' + global_knowledge["wss"][active_frame]['name']
             else:
@@ -802,10 +750,10 @@ def show_ui():
         pygame.display.update()
         clock.tick(FPS)
 
-
     pygame.display.quit()
     pygame.display.init()
 
+    # If quitting without jump, jump back to the active workspace on the primary output
     if not jump:
         cmd = 'workspace ' + global_knowledge["wss"][global_knowledge['visible_ws_primary']]['name'] + ';'
 
