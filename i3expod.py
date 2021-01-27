@@ -593,6 +593,7 @@ def show_ui():
 
     # Get screenshot aspect ratio and scale it to be a bit smaller than the workspaces thumb
     focused_win_thumb = None
+    rectangle = None
     if focused_win_screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
         ar = min(focused_win_size) / max(focused_win_size)
         factor = 1.5
