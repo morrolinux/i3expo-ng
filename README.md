@@ -52,6 +52,19 @@ location in the code).
 Copy `defaultconfig` into `~/.config/i3expo/config`.
 Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 
+Display output names can be unpleasant to read but you can alias them in hte config file if you wish.
+Here's an example:
+
+```
+[OUTPUT_ALIASES]
+
+DVI-D-0 = Center
+HDMI-A-0 = Right
+DisplayPort-0 = Left
+
+```
+
+
 Add this to your `i3` config
 `exec_always "~/i3expo-ng/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
 

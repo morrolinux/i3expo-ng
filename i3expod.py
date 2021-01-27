@@ -31,7 +31,7 @@ args = parser.parse_args()
 pp = pprint.PrettyPrinter(indent=4)
 
 global_updates_running = True
-global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary': None}
+global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary': None, 'out_aliases': {}}
 
 pygame.display.init()
 pygame.font.init()
@@ -162,6 +162,9 @@ defaults = {
 
 def read_config():
     config.read(os.path.join(xdg_config_home, "i3expo", "config"))
+    # Read custom labels for output names (if any)
+    for key in config['OUTPUT_ALIASES']:
+        global_knowledge['out_aliases'][key] = config['OUTPUT_ALIASES'][key]
     for option in defaults.keys():
         if not isset(option):
             if defaults[option][1] == None:
@@ -589,9 +592,15 @@ def show_ui():
                 # Put the right label (workspace name or output name for the ws to be created on)
                 if index in global_knowledge["wss"].keys():
                     name = global_knowledge["wss"][index]['name']
-                    name += " (" + global_knowledge["wss"][index]['output'] + ")"
+                    out_name = global_knowledge["wss"][index]['output']
+                    if out_name.lower() in global_knowledge['out_aliases'].keys():
+                        out_name = global_knowledge['out_aliases'][out_name.lower()]
+                    name += " (" + out_name + ")"
                 else:
                     name = new_wss_output[index].name
+                    if name.lower() in global_knowledge['out_aliases'].keys():
+                        name = global_knowledge['out_aliases'][name.lower()]
+
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
                 name_x = origin_x + round((tiles_outer_w_dyn- name_width) / 2)

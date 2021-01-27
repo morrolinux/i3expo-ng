@@ -27,3 +27,8 @@ names_color = None
 
 highlight_percentage = None
 
+[OUTPUT_ALIASES]
+
+DVI-D-0 = Center
+HDMI-A-0 = Right
+DisplayPort-0 = Left
