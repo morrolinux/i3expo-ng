@@ -29,6 +29,7 @@ parser.add_argument("-m", "--mode", default="filler", help="Workspace allocation
         sequential: Any new workspace is always the last one, starting from 1000. e.g: [1, 3] -> [1, 3, 1000]\
         filler [default]: Allocate new workspaces by filling gaps in indexes e.g: [1, 3] -> [1, 2, 3]")
 parser.add_argument("-w", "--wp", default=None, help="Set your wallpaper to be used to represent new/empty workspaces")
+
 args = parser.parse_args()
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -155,6 +156,7 @@ defaults = {
         ('UI', 'names_font'): (config.get, 'sans-serif'),
         ('UI', 'names_fontsize'): (config.getint, 25),
         ('UI', 'names_color'): (get_color, get_color(raw = 'white')),
+        ('UI', 'names_position'): (config.get, "under"),
         ('UI', 'highlight_percentage'): (config.getint, 20),
 }
 
@@ -518,9 +520,41 @@ def show_ui():
                     image = pygame.transform.smoothscale(image, (result_x, result_y))
                     thumb_cache[index] = image
 
+                # Put the right label (workspace name or output name for the ws to be created on)
+                if index in global_knowledge["wss"].keys():
+                    name = global_knowledge["wss"][index]['name']
+                    out_name = global_knowledge["wss"][index]['output']
+                    if out_name.lower() in global_knowledge['out_aliases'].keys():
+                        out_name = global_knowledge['out_aliases'][out_name.lower()]
+                    name += " (" + out_name + ")"
+                else:
+                    name = new_wss_output[index].name
+                    if name.lower() in global_knowledge['out_aliases'].keys():
+                        name = global_knowledge['out_aliases'][name.lower()]
+
+                # Calculate label / caption
+                name = font.render(name, True, names_color)
+                name_width = name.get_rect().size[0]
+                name_x = tile_origin_x + round((tiles_outer_w_dyn- name_width) / 2)
+                name_y = tile_origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
+
+                if get_config('UI', 'names_position') == "inside":
+                    name_size = name.get_size()
+                    name_bg_margin_x = 8
+                    name_bg_margin_y = 8
+                    name_size = (name_size[0] + name_bg_margin_x, name_size[1] + name_bg_margin_y)
+                    name_bg = pygame.Surface(name_size)
+                    name_bg.fill((0, 0, 0))
+                    name_bg.blit(name, (name_bg_margin_x/2, name_bg_margin_x/2))
+                    name = name_bg
+                    name_y = tile_origin_y + tiles_inner_h - name.get_rect().size[1]
+
                 # DRAW the screenshot as a thumbnail
                 screen.blit(image, (tile_origin_x + frame_thickness + offset_x,
                                     tile_origin_y + frame_thickness + offset_y), crop)
+
+                # Draw the label / caption
+                screen.blit(name, (name_x, name_y))
 
                 # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
@@ -538,24 +572,6 @@ def show_ui():
                     frames[index]['mouseondrag'] = mouseondrag.copy()
                     frames[index]['mouseoff'] = mouseoff.copy()
 
-                # Put the right label (workspace name or output name for the ws to be created on)
-                if index in global_knowledge["wss"].keys():
-                    name = global_knowledge["wss"][index]['name']
-                    out_name = global_knowledge["wss"][index]['output']
-                    if out_name.lower() in global_knowledge['out_aliases'].keys():
-                        out_name = global_knowledge['out_aliases'][out_name.lower()]
-                    name += " (" + out_name + ")"
-                else:
-                    name = new_wss_output[index].name
-                    if name.lower() in global_knowledge['out_aliases'].keys():
-                        name = global_knowledge['out_aliases'][name.lower()]
-
-                # Draw the caption
-                name = font.render(name, True, names_color)
-                name_width = name.get_rect().size[0]
-                name_x = tile_origin_x + round((tiles_outer_w_dyn- name_width) / 2)
-                name_y = tile_origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
-                screen.blit(name, (name_x, name_y))
 
     pygame.display.flip()
 

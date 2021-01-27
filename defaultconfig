@@ -2,28 +2,29 @@
 
 bgcolor = None
 
-padding_percent_x = 2
-padding_percent_y = 3
-spacing_percent_x = 2
-spacing_percent_y = 3
+padding_percent_x = 4
+padding_percent_y = 4
+spacing_percent_x = 4
+spacing_percent_y = 4
 
 frame_width_px = None
 frame_active_color = None
 frame_inactive_color = None
 frame_unknown_color = None
-frame_empty_color = None
 frame_nonexistant_color = None
 
 tile_active_color = None
 tile_inactive_color = None
 tile_unknown_color = None
-tile_empty_color = None
 tile_nonexistant_color = None
 
 names_show = None
 names_font = None
 names_fontsize = None
 names_color = None
+
+names_position = under
+# names_position = inside
 
 highlight_percentage = None
 
