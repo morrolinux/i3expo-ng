@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw
 from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
 from PIL import Image, ImageFilter, ImageEnhance
+from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
@@ -79,8 +80,7 @@ def signal_show(signal, frame):
 
         # Open the expo view on the primary output:
         # 1) Get primary monitor name
-        primary_output_name = subprocess.Popen('xrandr | grep "primary" | cut -d" " -f1',
-                                               shell=True, stdout=subprocess.PIPE).communicate()[0].split()[0].decode()
+        primary_output_name = get_primary_output_name()
 
         # 2) Get the visible workspace on the primary monitor
         visible_ws_primary = [w.num for w in i3.get_workspaces()
