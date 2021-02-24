@@ -10,6 +10,7 @@ clean:
 
 
 install: $(CONFIG_DIR) copy_default_config
+	pip3 install -r requirements.txt
 	@echo "i3expo-ng installed to $(CONFIG_DIR)"
 
 $(CONFIG_DIR): prtscn.so $(PYTHON_FILES)

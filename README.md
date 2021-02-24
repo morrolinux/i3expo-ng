@@ -42,7 +42,13 @@ Example output:
 
 # Usage
 
-Compile the `prtscn.c` as follows:
+## Compile and install
+
+Compile with `make` and install with `make install`.
+
+#### Manual compilation
+
+Compile the `prtscn.c` with `make` or manually as follows:
 
 `gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c -lX11`
 
@@ -54,6 +60,9 @@ Copy the default config to your `.config` folder like so:
 mkdir -p ~/.config/i3expo
 cp defaultconfig ~/.config/i3expo/config
 ```
+
+## Configuration
+
 Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 
 Display output names can be unpleasant to read but you can alias them in hte config file if you wish.
@@ -68,6 +77,7 @@ DisplayPort-0 = Left
 
 ```
 
+## Startup
 
 Add this to your `i3` config
 `exec_always "~/i3expo-ng/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
