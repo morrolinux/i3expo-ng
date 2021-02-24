@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 
+
 import ctypes
 import os
 import configparser
 import xdg
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 import i3ipc
 import copy
