@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 
+
 import ctypes
 import os
 import configparser
 import xdg
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 import i3ipc
 import copy
@@ -21,6 +23,25 @@ from PIL import Image, ImageDraw
 from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
 from PIL import Image, ImageFilter, ImageEnhance
+
+def get_primary_output_name():
+    stdout,stderr = subprocess.Popen('xrandr --listmonitors',
+                    shell=True, stdout=subprocess.PIPE).communicate()
+    if stdout != '':
+        monitorlines = stdout.decode().split("\n")
+        # Search for the primary (marked with +*)
+        # If none found (e.g. primary is on a disconnected output), take the first
+        primary=None
+        for m in monitorlines:
+          if "+*" in m:
+            primary=m
+            break # Early exit from the cycle
+          elif "+" in m:
+            primary=m   # We found a monitor. Keep it
+        if primary != None:
+            return primary.split()[-1]
+    return None
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
@@ -79,8 +100,7 @@ def signal_show(signal, frame):
 
         # Open the expo view on the primary output:
         # 1) Get primary monitor name
-        primary_output_name = subprocess.Popen('xrandr | grep "primary" | cut -d" " -f1',
-                                               shell=True, stdout=subprocess.PIPE).communicate()[0].split()[0].decode()
+        primary_output_name = get_primary_output_name()
 
         # 2) Get the visible workspace on the primary monitor
         visible_ws_primary = [w.num for w in i3.get_workspaces()

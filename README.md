@@ -42,7 +42,13 @@ Example output:
 
 # Usage
 
-Compile the `prtscn.c` as follows:
+## Compile and install
+
+Compile with `make` and install with `make install`.
+
+#### Manual compilation
+
+Compile the `prtscn.c` with `make` or manually as follows:
 
 `gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c -lX11`
 
@@ -54,9 +60,12 @@ Copy the default config to your `.config` folder like so:
 mkdir -p ~/.config/i3expo
 cp defaultconfig ~/.config/i3expo/config
 ```
+
+## Configuration
+
 Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 
-Display output names can be unpleasant to read but you can alias them in hte config file if you wish.
+Display output names can be unpleasant to read but you can alias them in the config file if you wish.
 Here's an example:
 
 ```
@@ -68,9 +77,17 @@ DisplayPort-0 = Left
 
 ```
 
+### Update the configuration
 
-Add this to your `i3` config
-`exec_always "~/i3expo-ng/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
+When installing with `make install`, an existing configuration file would be maintained.
+
+If the program crashes due to missing fields in the config file (e.g. after an update), you can force the copy of the default config with `make install FORCE=1`.
+The old one will be maintained as `config.old`.
+
+## Startup
+
+Add this to your `i3` config:
+`exec_always "~/.local/bin/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
 
 `-f` is for fullscreen (causes pygame to crash on a black screen on some distros)
 
