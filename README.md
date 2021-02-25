@@ -65,7 +65,7 @@ cp defaultconfig ~/.config/i3expo/config
 
 Colors can be specified by using their PyGame names or in #fff or #ffffff hex.
 
-Display output names can be unpleasant to read but you can alias them in hte config file if you wish.
+Display output names can be unpleasant to read but you can alias them in the config file if you wish.
 Here's an example:
 
 ```
@@ -77,10 +77,17 @@ DisplayPort-0 = Left
 
 ```
 
+### Update the configuration
+
+When installing with `make install`, an existing configuration file would be maintained.
+
+If the program crashes due to missing fields in the config file (e.g. after an update), you can force the copy of the default config with `make install FORCE=1`.
+The old one will be maintained as `config.old`.
+
 ## Startup
 
-Add this to your `i3` config
-`exec_always "~/i3expo-ng/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
+Add this to your `i3` config:
+`exec_always "~/.local/bin/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
 
 `-f` is for fullscreen (causes pygame to crash on a black screen on some distros)
 
