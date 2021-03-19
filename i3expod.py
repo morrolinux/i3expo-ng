@@ -205,17 +205,6 @@ def isset(option):
         return False
 
 def grab_screen(x=None, y=None, w=None, h=None):
-    focused_ws = i3.get_tree().find_focused().workspace()
-    wsw = focused_ws.rect.width
-    wsh = focused_ws.rect.height
-
-    if x + w > wsw:
-        print(f"grab_screen({x}, {y}, {w}, {h}) clipping size")
-        w = wsw - x 
-    if y + h > wsh:
-        print(f"grab_screen({x}, {y}, {w}, {h}) clipping size")
-        h = wsh - y
-
     size = w * h
     objlength = size * 3    # RGB has 3 channels... (R, G, B)
 
