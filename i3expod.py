@@ -19,10 +19,9 @@ import random
 import subprocess
 import math
 from threading import Thread
-from PIL import Image, ImageDraw
 from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
-from PIL import Image, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter, ImageEnhance, Image, ImageDraw
 
 def get_primary_output_name():
     stdout,stderr = subprocess.Popen('xrandr --listmonitors',

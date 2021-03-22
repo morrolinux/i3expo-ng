@@ -39,7 +39,8 @@ Example output:
 - Python 3
 - PyGame
 - i3ipc
-
+- pillow
+- xdg
 # Usage
 
 ## Compile and install
