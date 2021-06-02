@@ -41,6 +41,7 @@ Example output:
 - i3ipc
 - pillow
 - xdg
+- pyxdg
 # Usage
 
 ## Compile and install
