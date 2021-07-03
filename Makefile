@@ -1,4 +1,4 @@
-CONFIG_DIR?=$(shell echo "$${XDG_CONFIG_HOME-$$HOME}/.config/i3expo")
+CONFIG_DIR?=$(shell echo "$${XDG_CONFIG_HOME-$$HOME}/i3expo")
 CONFIG_FILE=$(CONFIG_DIR)/config
 # The local files we need to install
 TARGETS=prtscn.so i3expod.py
