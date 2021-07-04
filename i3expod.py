@@ -19,7 +19,11 @@ import random
 import subprocess
 import math
 from threading import Thread
-from xdg.BaseDirectory import xdg_config_home
+try:
+    from xdg import xdg_config_home
+    xdg_config_home = str(xdg_config_home())
+except ImportError:
+    from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
 from PIL import Image, ImageFilter, ImageEnhance, Image, ImageDraw
 
