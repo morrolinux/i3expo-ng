@@ -19,7 +19,11 @@ import random
 import subprocess
 import math
 from threading import Thread
-from xdg import xdg_config_home
+try:
+    from xdg import xdg_config_home
+    xdg_config_home = str(xdg_config_home())
+except ImportError:
+    from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
 from PIL import Image, ImageFilter, ImageEnhance, Image, ImageDraw
 
@@ -180,7 +184,7 @@ defaults = {
 }
 
 def read_config():
-    config.read(os.path.join(str(xdg_config_home()), "i3expo", "config"))
+    config.read(os.path.join(xdg_config_home, "i3expo", "config"))
     # Read custom labels for output names (if any)
     for key in config['OUTPUT_ALIASES']:
         global_knowledge['out_aliases'][key] = config['OUTPUT_ALIASES'][key]
