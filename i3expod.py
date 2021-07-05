@@ -46,6 +46,18 @@ def get_primary_output_name():
     return None
 
 
+def get_primary_output_monitor_size():
+    xrandr_query = f"xrandr --query | awk -F '[ +]' '/{get_primary_output_name()}/{{print $4}}'"
+    stdout,stderr = subprocess.Popen(xrandr_query, shell=True,
+                    stdout=subprocess.PIPE).communicate()
+
+    # The stdout from awk needs to be decoded, stripped from newline and split
+    # The output should be similar to: b'1920x1080\n', we want a list instead
+    monitor_size = list(map(int, stdout.decode('utf-8').strip().split('x')))
+
+    return monitor_size
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
                     help="run in fullscreen")
@@ -308,7 +320,7 @@ def show_ui():
     outputs = global_knowledge["outputs"]
 
     # Get monitor size
-    monitor_size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
+    monitor_size = get_primary_output_monitor_size()
 
     # Calculate grid size in a more efficient way taking into account orientation:
     # Vertical screens take about 1/3 of the horizontal size so we can fit more frames in a row.
