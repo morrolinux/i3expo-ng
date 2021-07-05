@@ -52,8 +52,10 @@ def get_primary_output_monitor_size():
                     stdout=subprocess.PIPE).communicate()
 
     # The stdout from awk needs to be decoded, stripped from newline and split
-    # The output should be similar to: b'1920x1080\n', we want a list instead
-    monitor_size = list(map(int, stdout.decode('utf-8').strip().split('x')))
+    # The output should be similar to: b'1920x1080\n\left\left', we want a list instead
+    out = stdout.decode('utf-8')
+    # We want to cut the string at the first \n
+    monitor_size = list(map(int, out[:out.find('\n')].strip().split('x')))
 
     return monitor_size
 
