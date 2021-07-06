@@ -60,6 +60,19 @@ def get_primary_output_monitor_size():
     return monitor_size
 
 
+def get_primary_output_monitor_displacement():
+    xrandr_query = f"xrandr --query | awk -F '[ +]' '/{get_primary_output_name()}/{{print $5,$6}}'"
+    stdout,stderr = subprocess.Popen(xrandr_query, shell=True,
+                    stdout=subprocess.PIPE).communicate()
+
+    out = stdout.decode('utf-8')
+    displacement = out[:out.find('\n')].replace(' ', ',')
+
+    return displacement
+
+# We can set the position of the window by using SDL environment variable
+os.environ['SDL_VIDEO_WINDOW_POS'] = get_primary_output_monitor_displacement()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fullscreen", action="store_true",
                     help="run in fullscreen")
