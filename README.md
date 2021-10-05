@@ -1,6 +1,6 @@
 # Overwiew
 
-Expo is an simple and straightforward way to get a visual impression of all your
+Expo is a simple and straightforward way to get a visual impression of all your
 current virtual desktops that many compositing window managers use.  It's not a
 very powerful approach, but a very intuitive one and especially fits workflows
 that use lots of temporary windows or those in which the workspaces are mentally
