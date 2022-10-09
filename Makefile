@@ -10,7 +10,7 @@ TARGET_PATHS?=$(TARGET_DIR)/prtscn.so $(TARGET_DIR)/i3expod.py
 FORCE?=0
 
 prtscn.so: prtscn.c
-	gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c -lX11
+	gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn `pkg-config --cflags --libs python3` -o prtscn.so prtscn.c -lX11
 
 clean:
 	rm prtscn.so
