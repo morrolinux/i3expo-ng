@@ -66,7 +66,7 @@ global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary'
 
 pygame.display.init()
 pygame.font.init()
-i3 = i3ipc.Connection()
+i3 = i3ipc.Connection(auto_reconnect=True)
 
 
 def signal_quit(signal, frame):
@@ -814,8 +814,7 @@ def reset_update_timer(i3, e):
     last_update = time.time()
 
 
-if __name__ == '__main__':
-
+def main():
     read_config()
     init_knowledge()
     update_state(i3, None)
@@ -827,7 +826,7 @@ if __name__ == '__main__':
     i3.on('window::fullscreen_mode', update_state)
     # i3.on('window::focus', update_state)
 
-    # Reset time counter so that the update thread does not take a screenshot 
+    # Reset time counter so that the update thread does not take a screenshot
     # while transitioning from one workspace to another, resulting in a dirty screenshot
     # if you use a compositor with fading enabled
     i3.on('workspace', reset_update_timer)
@@ -839,3 +838,7 @@ if __name__ == '__main__':
     while True:
         time.sleep(1)
         update_state(i3, None)
+
+
+if __name__ == '__main__':
+    main()

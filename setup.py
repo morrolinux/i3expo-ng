@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-
 from distutils.core import setup, Extension
+
+import setuptools
 
 prtscn = Extension(
     'prtscn',
@@ -15,5 +16,18 @@ setup(
     description='',
     scripts=['i3expod.py'],
     ext_modules=[prtscn],
-    license='MIT'
+    license='MIT',
+    packages=setuptools.find_packages(),
+    install_requires=[
+        'pygame',
+        'i3ipc',
+        'pillow',
+        'xdg',
+        'pyxdg',
+    ],
+    entry_points={
+        'console_scripts': [
+            'i3expod=i3expod:main'
+        ]
+    }
 )
