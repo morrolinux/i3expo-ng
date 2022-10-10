@@ -52,7 +52,7 @@ Compile with `make` and install with `make install`.
 
 Compile the `prtscn.c` with `make` or manually as follows:
 
-`gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c -lX11`
+```gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn `pkg-config --cflags --libs python3` -o prtscn.so prtscn.c -lX11```
 
 Put the `prtscn.so` in the same directory as the Python script (or adjust the
 location in the code).
