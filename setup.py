@@ -1,23 +1,21 @@
 #!/usr/bin/env python
-from distutils.core import setup, Extension
-
-import setuptools
+from setuptools import setup, Extension, find_packages
 
 prtscn = Extension(
     'prtscn',
     sources=['prtscn.c'],
     libraries=['X11'],
-    language="c",
+    language='c',
 )
 
 setup(
     name='i3expod',
     version='0.0.0',
-    description='',
+    description='Exposè for i3 WM',
     scripts=['i3expod.py'],
     ext_modules=[prtscn],
     license='MIT',
-    packages=setuptools.find_packages(),
+    packages=find_packages(),
     install_requires=[
         'pygame',
         'i3ipc',
