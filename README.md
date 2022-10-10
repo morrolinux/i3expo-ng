@@ -70,14 +70,14 @@ cp defaultconfig ~/.config/i3expo/config
 ### Install in Ubuntu
 
 ```
-apt-get install python3-pip python-setuptools libx11-dev make gcc
+apt-get install python3-pip python-setuptools libx11-dev make gcc x11-xserver-utils
 make install
 ```
 
 ### Install in Arch Linux
 
 ```
-pacman -S libx11 python-pip make gcc
+pacman -S libx11 python-pip make gcc xorg-xrandr
 make install
 ```
 
