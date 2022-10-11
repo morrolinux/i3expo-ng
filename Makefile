@@ -3,8 +3,13 @@ CONFIG_FILE=$(CONFIG_DIR)/config
 # Force the installation of config file?
 FORCE?=0
 
-PYTHON=python3
-PIP=$(PYTHON) -m pip
+# Previous version installation dir
+PREV_TARGET_DIR?=${HOME}/.local/bin
+# Previous final file paths
+PREV_TARGET_PATHS?=$(PREV_TARGET_DIR)/prtscn.so $(PREV_TARGET_DIR)/i3expod.py
+
+PYTHON?=python3
+PIP?=$(PYTHON) -m pip
 
 pip3dependencies:
 	$(PIP) install -r requirements.txt
@@ -26,12 +31,17 @@ $(CONFIG_FILE): defaultconfig
 build:
 	$(PYTHON) setup.py sdist
 
-install: pip3dependencies $(CONFIG_FILE) build
+install: pip3dependencies $(CONFIG_FILE) build uninstall_previous_version
 	$(PIP) install .
 
-uninstall:
+uninstall: uninstall_previous_version
 	@echo -n "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
 	$(PIP) uninstall i3expod
+
+uninstall_previous_version:
+ifneq (,$(wildcard $(PREV_TARGET_PATHS)))
+	rm -f $(PREV_TARGET_PATHS)
+endif
 
 clean:
 	$(PYTHON) setup.py clean
@@ -39,4 +49,4 @@ clean:
 	rm -rf dist
 	rm -rf i3expod.egg-info
 
-PHONY: clean install uninstall pip3dependencies $(CONFIG_FILE)
+PHONY: clean install uninstall pip3dependencies $(CONFIG_FILE) uninstall_previous_version
