@@ -46,6 +46,7 @@ static PyObject *getScreenMethod(PyObject *self, PyObject *args) {
     unsigned char *data = (unsigned char *) malloc(data_size);
     getScreen(xx, yy, W, H, data);
     PyObject *result = Py_BuildValue("y#", data, data_size);
+    free(data);
     return result;
 }
 
