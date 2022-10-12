@@ -8,7 +8,7 @@ arranged in a grid.
 
 i3expo emulates that function within the limitations of a non-compositing window
 manager. By listening to the IPC, it takes a screenshot whenever a window event
-occurrs. Thanks to an extremely fast C library, this produces negligible
+occurs. Thanks to an extremely fast C library, this produces negligible
 overhead in normal operation and allows the script to remember what state you
 left a workspace in.
 
@@ -48,20 +48,46 @@ Example output:
 
 Compile with `make` and install with `make install`.
 
-#### Manual compilation
+### Manual compilation
 
-Compile the `prtscn.c` with `make` or manually as follows:
+Compile the package with `make` or manually as follows:
 
-`gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c -lX11`
+```
+python3 setup.py sdist
+```
 
-Put the `prtscn.so` in the same directory as the Python script (or adjust the
-location in the code).
+Install with:
+```
+pip install .
+```
 
 Copy the default config to your `.config` folder like so:
 ```
 mkdir -p ~/.config/i3expo
 cp defaultconfig ~/.config/i3expo/config
 ```
+
+### Install in Ubuntu
+
+```
+apt-get install python3-pip python-setuptools libx11-dev make gcc x11-xserver-utils
+make install
+```
+
+### Install in Arch Linux
+
+```
+pacman -S libx11 python-pip make gcc xorg-xrandr
+make install
+```
+
+### Manual compile python extension
+
+You can compile the `prtscn.c` manually with:
+
+```gcc -shared -O3 -Wall -fPIC -Wl,-soname,prtscn `pkg-config --cflags --libs python3` -o prtscn.so prtscn.c -lX11```
+
+( not needed if you use `python setup.py` or `make` )
 
 ## Configuration
 
@@ -89,7 +115,7 @@ The old one will be maintained as `config.old`.
 ## Startup
 
 Add this to your `i3` config:
-`exec_always "~/.local/bin/i3expod.py -f -w /home/user/Images/wallpapers/14.jpg"`
+`exec_always --no-startup-id ~/.local/bin/i3expod -f -w /home/user/Images/wallpapers/14.jpg`
 
 `-f` is for fullscreen (causes pygame to crash on a black screen on some distros)
 
@@ -98,7 +124,7 @@ Add this to your `i3` config:
 **All parameters are optional.**
 
 Send `SIGUSR1` to `i3expod.py` to show the Expo UI, for example by adding 
-`bindsym $mod+Tab exec --no-startup-id "killall -s SIGUSR1 i3expod.py"` to your i3 `config`. Send `SIGHUP`
+`bindsym $mod+Tab exec --no-startup-id "killall -s SIGUSR1 i3expod"` to your i3 `config`. Send `SIGHUP`
 to have the application reload its configuration.
 
 

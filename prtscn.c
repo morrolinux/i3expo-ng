@@ -1,10 +1,12 @@
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include "prtscn.h"
 #include <stdio.h>
 #include <X11/X.h>
 #include <X11/Xutil.h>
-//Compile hint: gcc -shared -O3 -lX11 -fPIC -Wl,-soname,prtscn -o prtscn.so prtscn.c
+//Compile hint: gcc -shared -O3 -lX11 -fPIC -Wl,-soname,prtscn `pkg-config --cflags --libs python3` -o prtscn.so prtscn.c
 
-void getScreen(const int, const int, const int, const int, unsigned char *);
-void getScreen(const int xx,const int yy,const int W, const int H, /*out*/ unsigned char * data) 
+static void getScreen(const int xx, const int yy, const int W, const int H, /*out*/ unsigned char * data)
 {
    Display *display = XOpenDisplay(NULL);
    Window root = DefaultRootWindow(display);
@@ -32,4 +34,34 @@ void getScreen(const int xx,const int yy,const int W, const int H, /*out*/ unsig
    XDestroyImage(image);
    XDestroyWindow(display, root);
    XCloseDisplay(display);
+}
+
+static PyObject *getScreenMethod(PyObject *self, PyObject *args) {
+   int xx, yy, W, H;
+    if (!PyArg_ParseTuple(args, "iiii", &xx, &yy, &W, &H)) {
+        PyErr_SetString(PyExc_TypeError, "arguments exception");
+        return Py_None;
+    }
+    int data_size = sizeof(unsigned char) * W * H * 3;
+    unsigned char *data = (unsigned char *) malloc(data_size);
+    getScreen(xx, yy, W, H, data);
+    PyObject *result = Py_BuildValue("y#", data, data_size);
+    free(data);
+    return result;
+}
+
+static PyMethodDef prtscnMethods[] = {
+    {"getScreen", getScreenMethod, METH_VARARGS, ""},
+    {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef prtscn = {
+    PyModuleDef_HEAD_INIT,
+    "prtscn",
+    "",
+    -1,
+    prtscnMethods
+};
+PyMODINIT_FUNC PyInit_prtscn(void) {
+   return PyModule_Create(&prtscn);
 }

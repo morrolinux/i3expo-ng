@@ -1,46 +1,46 @@
 #!/usr/bin/python3
 
 
-import ctypes
-import os
 import configparser
-import xdg
+import os
+
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 import i3ipc
-import copy
 import signal
 import sys
-import traceback
 import pprint
 import time
 import argparse
-import random
 import subprocess
 import math
 from threading import Thread
+import prtscn
+
 try:
     from xdg import xdg_config_home
+
     xdg_config_home = str(xdg_config_home())
 except ImportError:
     from xdg.BaseDirectory import xdg_config_home
 from contextlib import suppress
-from PIL import Image, ImageFilter, ImageEnhance, Image, ImageDraw
+from PIL import ImageFilter, ImageEnhance, Image
+
 
 def get_primary_output_name():
-    stdout,stderr = subprocess.Popen('xrandr --listmonitors',
-                    shell=True, stdout=subprocess.PIPE).communicate()
+    stdout, stderr = subprocess.Popen('xrandr --listmonitors',
+                                      shell=True, stdout=subprocess.PIPE).communicate()
     if stdout != '':
         monitorlines = stdout.decode().split("\n")
         # Search for the primary (marked with +*)
         # If none found (e.g. primary is on a disconnected output), take the first
-        primary=None
+        primary = None
         for m in monitorlines:
-          if "+*" in m:
-            primary=m
-            break # Early exit from the cycle
-          elif "+" in m:
-            primary=m   # We found a monitor. Keep it
+            if "+*" in m:
+                primary = m
+                break  # Early exit from the cycle
+            elif "+" in m:
+                primary = m  # We found a monitor. Keep it
         if primary != None:
             return primary.split()[-1]
     return None
@@ -66,11 +66,8 @@ global_knowledge = {'active': 0, 'wss': {}, 'ui_cache': {}, 'visible_ws_primary'
 
 pygame.display.init()
 pygame.font.init()
-i3 = i3ipc.Connection()
+i3 = i3ipc.Connection(auto_reconnect=True)
 
-screenshot_lib = 'prtscn.so'
-screenshot_lib_path = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + screenshot_lib
-grab = ctypes.CDLL(screenshot_lib_path)
 
 def signal_quit(signal, frame):
     print("Shutting down...")
@@ -79,8 +76,10 @@ def signal_quit(signal, frame):
     i3.main_quit()
     sys.exit(0)
 
+
 def signal_reload(signal, frame):
     read_config()
+
 
 def signal_show(signal, frame):
     global global_updates_running
@@ -99,7 +98,7 @@ def signal_show(signal, frame):
         global_knowledge['wss'][global_knowledge['active']]['focused_win_name'] = focused_win.name
         global_knowledge['wss'][global_knowledge['active']]['focused_win_id'] = focused_win.id
         global_knowledge['wss'][global_knowledge['active']]['focused_win_size'] = \
-            (focused_win.window_rect.width, focused_win.window_rect.height )
+            (focused_win.window_rect.width, focused_win.window_rect.height)
 
         # Open the expo view on the primary output:
         # 1) Get primary monitor name
@@ -115,9 +114,10 @@ def signal_show(signal, frame):
                    '; workspace i3expod-temporary-workspace')
 
         # 4) And start the UI thread
-        ui_thread = Thread(target = show_ui)
+        ui_thread = Thread(target=show_ui)
         ui_thread.daemon = True
         ui_thread.start()
+
 
 # Bind signals
 signal.signal(signal.SIGINT, signal_quit)
@@ -127,7 +127,8 @@ signal.signal(signal.SIGUSR1, signal_show)
 
 config = configparser.RawConfigParser()
 
-def get_color(section = None, option = None, raw = None):
+
+def get_color(section=None, option=None, raw=None):
     if not raw:
         raw = config.get(section, option)
 
@@ -161,27 +162,29 @@ def get_color(section = None, option = None, raw = None):
 
     raise ValueError
 
+
 defaults = {
-        ('UI', 'bgcolor'): (get_color, get_color(raw = 'gray20')),
-        ('UI', 'padding_percent_x'): (config.getint, 5),
-        ('UI', 'padding_percent_y'): (config.getint, 5),
-        ('UI', 'spacing_percent_x'): (config.getint, 5),
-        ('UI', 'spacing_percent_y'): (config.getint, 5),
-        ('UI', 'frame_width_px'): (config.getint, 5),
-        ('UI', 'frame_active_color'): (get_color, get_color(raw = '#3b4f8a')),
-        ('UI', 'frame_inactive_color'): (get_color, get_color(raw = '#43747b')),
-        ('UI', 'frame_unknown_color'): (get_color, get_color(raw = '#c8986b')),
-        ('UI', 'frame_nonexistant_color'): (get_color, get_color(raw = 'gray30')),
-        ('UI', 'tile_active_color'): (get_color, get_color(raw = '#5a6da4')),
-        ('UI', 'tile_inactive_color'): (get_color, get_color(raw = '#93afb3')),
-        ('UI', 'tile_unknown_color'): (get_color, get_color(raw = '#ffe6d0')),
-        ('UI', 'tile_nonexistant_color'): (get_color, get_color(raw = 'gray40')),
-        ('UI', 'names_font'): (config.get, 'sans-serif'),
-        ('UI', 'names_fontsize'): (config.getint, 25),
-        ('UI', 'names_color'): (get_color, get_color(raw = 'white')),
-        ('UI', 'names_position'): (config.get, "under"),
-        ('UI', 'highlight_percentage'): (config.getint, 20),
+    ('UI', 'bgcolor'): (get_color, get_color(raw='gray20')),
+    ('UI', 'padding_percent_x'): (config.getint, 5),
+    ('UI', 'padding_percent_y'): (config.getint, 5),
+    ('UI', 'spacing_percent_x'): (config.getint, 5),
+    ('UI', 'spacing_percent_y'): (config.getint, 5),
+    ('UI', 'frame_width_px'): (config.getint, 5),
+    ('UI', 'frame_active_color'): (get_color, get_color(raw='#3b4f8a')),
+    ('UI', 'frame_inactive_color'): (get_color, get_color(raw='#43747b')),
+    ('UI', 'frame_unknown_color'): (get_color, get_color(raw='#c8986b')),
+    ('UI', 'frame_nonexistant_color'): (get_color, get_color(raw='gray30')),
+    ('UI', 'tile_active_color'): (get_color, get_color(raw='#5a6da4')),
+    ('UI', 'tile_inactive_color'): (get_color, get_color(raw='#93afb3')),
+    ('UI', 'tile_unknown_color'): (get_color, get_color(raw='#ffe6d0')),
+    ('UI', 'tile_nonexistant_color'): (get_color, get_color(raw='gray40')),
+    ('UI', 'names_font'): (config.get, 'sans-serif'),
+    ('UI', 'names_fontsize'): (config.getint, 25),
+    ('UI', 'names_color'): (get_color, get_color(raw='white')),
+    ('UI', 'names_position'): (config.get, "under"),
+    ('UI', 'highlight_percentage'): (config.getint, 20),
 }
+
 
 def read_config():
     config.read(os.path.join(xdg_config_home, "i3expo", "config"))
@@ -196,8 +199,10 @@ def read_config():
                 sys.exit(1)
             config.set(*option, value=defaults[option][1])
 
+
 def get_config(*option):
     return defaults[option][0](*option)
+
 
 def isset(option):
     try:
@@ -207,29 +212,25 @@ def isset(option):
     except ValueError:
         return False
 
+
 def grab_screen(x=None, y=None, w=None, h=None):
-    size = w * h
-    objlength = size * 3    # RGB has 3 channels... (R, G, B)
-
-    grab.getScreen.argtypes = []
-    result = (ctypes.c_ubyte*objlength)()
-
-    grab.getScreen(x, y, w, h, result)
+    result = prtscn.getScreen(x, y, w, h)
     pil = Image.frombuffer('RGB', (w, h), result, 'raw', 'RGB', 0, 1)
-    #draw = ImageDraw.Draw(pil)
-    #draw.text((100,100), 'abcde')
+    # draw = ImageDraw.Draw(pil)
+    # draw.text((100,100), 'abcde')
     return pygame.image.fromstring(pil.tobytes(), pil.size, pil.mode)
+
 
 def update_workspace(workspace, screenshot=None):
     if workspace.num not in global_knowledge["wss"].keys():
         global_knowledge["wss"][workspace.num] = {
-                'name': None,
-                'screenshot': None,
-                'windows': {},
-                'size': (0, 0),
-                'output': "",
-                'focused_win_screenshot': None,
-                'focused_win_size': None
+            'name': None,
+            'screenshot': None,
+            'windows': {},
+            'size': (0, 0),
+            'output': "",
+            'focused_win_screenshot': None,
+            'focused_win_size': None
         }
 
     global_knowledge["wss"][workspace.num]['size'] = (workspace.rect.width, workspace.rect.height)
@@ -240,12 +241,14 @@ def update_workspace(workspace, screenshot=None):
 
     global_knowledge["active"] = workspace.num
 
+
 def init_knowledge():
     root = i3.get_tree()
     for workspace in root.workspaces():
         update_workspace(workspace)
     # all outputs but the virtual ones
     global_knowledge["outputs"] = [o for o in i3.get_outputs() if o.name.find('xroot') < 0]
+
 
 def update_state(i3, e):
     global last_update
@@ -270,7 +273,7 @@ def update_state(i3, e):
     deleted.sort()  # make sure we're deleting the right items while iterating
     deleted.reverse()
     for num in deleted:
-        del(global_knowledge["wss"][num])
+        del (global_knowledge["wss"][num])
 
     # Take a screenshot and update the active workspace
     screenshot = grab_screen(x=current_workspace.rect.x, y=current_workspace.rect.y,
@@ -280,6 +283,7 @@ def update_state(i3, e):
     # Make sure this function isn't called too frequently
     reset_update_timer(i3, e)
 
+
 def get_hovered_frame(mpos, frames):
     for frame in frames.keys():
         if frames[frame]['ul'][0] < mpos[0] < frames[frame]['br'][0] \
@@ -287,15 +291,17 @@ def get_hovered_frame(mpos, frames):
             return frame
     return None
 
+
 def gen_active_win_overlay(rectangle, alpha=255):
     # Calculate active border overlay
     win_pad = int(max((rectangle.height * 2) / 100, (rectangle.width * 2) / 100))
     win_pad = win_pad + 1 if win_pad % 2 != 0 else win_pad
     lightmask = pygame.Surface((rectangle.width + win_pad, rectangle.height + win_pad),
-            pygame.SRCALPHA, 32).convert_alpha()
-    lightmask_position = (rectangle.x - int(win_pad/2), rectangle.y - int(win_pad/2))
+                               pygame.SRCALPHA, 32).convert_alpha()
+    lightmask_position = (rectangle.x - int(win_pad / 2), rectangle.y - int(win_pad / 2))
     lightmask.fill(YELLOW + (alpha,))
     return lightmask, lightmask_position
+
 
 def show_ui():
     global global_updates_running
@@ -321,7 +327,7 @@ def show_ui():
         a = 0
         if h > w:
             # tmp += (w / (h / (w / h) ))  # exact
-            tmp += 1/2                     # any gap approximation
+            tmp += 1 / 2  # any gap approximation
         else:
             tmp += 1
     for o in outputs:
@@ -329,7 +335,7 @@ def show_ui():
         h = o.rect.height
         if h > w:
             # tmp += (w / (h / (w / h) ))
-            tmp += 1/2
+            tmp += 1 / 2
         else:
             tmp += 1
 
@@ -343,12 +349,12 @@ def show_ui():
     frame_inactive_color = get_config('UI', 'frame_inactive_color')
     frame_unknown_color = get_config('UI', 'frame_unknown_color')
     frame_nonexistant_color = get_config('UI', 'frame_nonexistant_color')
-    
+
     tile_active_color = get_config('UI', 'bgcolor')
     tile_inactive_color = get_config('UI', 'bgcolor')
     tile_unknown_color = get_config('UI', 'tile_unknown_color')
     tile_nonexistant_color = get_config('UI', 'tile_nonexistant_color')
-    
+
     names_font = get_config('UI', 'names_font')
     names_fontsize = get_config('UI', 'names_fontsize')
     names_color = get_config('UI', 'names_color')
@@ -384,14 +390,14 @@ def show_ui():
     frames_gap_h = tiles_outer_h + tiles_gap_h
 
     # Thumbnails for ? and +
-    thumb_missing = pygame.Surface((monitor_size[0], monitor_size[1]), pygame.SRCALPHA, 32) 
+    thumb_missing = pygame.Surface((monitor_size[0], monitor_size[1]), pygame.SRCALPHA, 32)
     thumb_missing = thumb_missing.convert_alpha()
     thumb_new = thumb_missing.copy()
     qm = pygame.font.SysFont('sans-serif', 550).render('?', True, (150, 150, 150))
     plss = pygame.font.SysFont('sans-serif', 550).render('+', True, (200, 200, 200))
     qm_size = qm.get_rect().size
-    origin_x = round((monitor_size[0] - qm_size[0])/2)
-    origin_y = round((monitor_size[1] - qm_size[1])/2)
+    origin_x = round((monitor_size[0] - qm_size[0]) / 2)
+    origin_y = round((monitor_size[1] - qm_size[1]) / 2)
     thumb_missing.blit(qm, (origin_x, origin_y))
 
     # if a wallpaper was specified, use that as a background for thumb_new
@@ -400,9 +406,9 @@ def show_ui():
             im = Image.open(args.wp)
             en = ImageEnhance.Brightness(im)
             wp_img = en.enhance(0.4)
-            wp_img = wp_img\
-                    .resize((monitor_size[0], monitor_size[1]), Image.NEAREST)\
-                    .filter(ImageFilter.GaussianBlur(radius=20))
+            wp_img = wp_img \
+                .resize((monitor_size[0], monitor_size[1]), Image.NEAREST) \
+                .filter(ImageFilter.GaussianBlur(radius=20))
             wp_img = pygame.image.fromstring(wp_img.tobytes(), wp_img.size, wp_img.mode)
             global_knowledge['ui_cache']['wp_img'] = wp_img
         wp_img = global_knowledge['ui_cache']['wp_img']
@@ -413,7 +419,7 @@ def show_ui():
     font = pygame.font.SysFont(names_font, names_fontsize)
 
     # Get existing workspaces indexes
-    wss_idx = [int(k) for k in global_knowledge["wss"].keys()] 
+    wss_idx = [int(k) for k in global_knowledge["wss"].keys()]
     # Sort workspace indexes by aspect ratio (landscape then portrait)
     wss_idx.sort(key=lambda x: global_knowledge['wss'][x]['size'][1])
 
@@ -439,15 +445,15 @@ def show_ui():
     kbd_grid = [-1 for _ in range(grid_y)]
     for i in range(len(kbd_grid)):
         kbd_grid[i] = [-1 for _ in range(grid_size * grid_size)]
-        
+
     # Thumbnails and frames cache
     thumb_cache = {i: None for i in wss_idx}
     frame_template = {'active': False,
-            'mouseoff': None,
-            'mouseon': None,
-            'mouseondrag': None,
-            'ul': (0, 0),
-            'br': (0, 0)} 
+                      'mouseoff': None,
+                      'mouseon': None,
+                      'mouseondrag': None,
+                      'ul': (0, 0),
+                      'br': (0, 0)}
     frames = {i: frame_template.copy() for i in wss_idx}
 
     def draw_grid():
@@ -475,7 +481,7 @@ def show_ui():
 
                     # Resize frame width for vertical workspaces
                     if ws_height > ws_width:
-                        factor = (ws_height / (ws_width / (ws_height / ws_width) ))
+                        factor = (ws_height / (ws_width / (ws_height / ws_width)))
                         tiles_outer_w_dyn = round(tiles_outer_w_dyn / factor)
                         tiles_inner_w_dyn = tiles_outer_w_dyn - 2 * frame_thickness
 
@@ -498,8 +504,8 @@ def show_ui():
                     tile_color = tile_active_color
                     frame_color = frame_active_color
                     image = global_knowledge["wss"][index]['screenshot']
-                elif index in global_knowledge["wss"].keys() and\
-                     global_knowledge["wss"][index]['screenshot']:
+                elif index in global_knowledge["wss"].keys() and \
+                        global_knowledge["wss"][index]['screenshot']:
                     tile_color = tile_inactive_color
                     frame_color = frame_inactive_color
                     image = global_knowledge["wss"][index]['screenshot']
@@ -529,7 +535,7 @@ def show_ui():
                     result_y = tiles_inner_h
                     offset_x = round((tiles_inner_w - result_x) / 2)
                     offset_y = 0
-                    crop = (tiles_inner_w/2 - tiles_inner_w_dyn/2, 0, tiles_inner_w_dyn, tiles_inner_h)
+                    crop = (tiles_inner_w / 2 - tiles_inner_w_dyn / 2, 0, tiles_inner_w_dyn, tiles_inner_h)
                 else:
                     result_x = tiles_inner_w_dyn
                     result_y = tiles_inner_h
@@ -558,7 +564,7 @@ def show_ui():
                 # Calculate label / caption
                 name = font.render(name, True, names_color)
                 name_width = name.get_rect().size[0]
-                name_x = tile_origin_x + round((tiles_outer_w_dyn- name_width) / 2)
+                name_x = tile_origin_x + round((tiles_outer_w_dyn - name_width) / 2)
                 name_y = tile_origin_y + tiles_outer_h + round(tiles_outer_h * 0.02)
 
                 if get_config('UI', 'names_position') == "inside":
@@ -568,7 +574,7 @@ def show_ui():
                     name_size = (name_size[0] + name_bg_margin_x, name_size[1] + name_bg_margin_y)
                     name_bg = pygame.Surface(name_size)
                     name_bg.fill((0, 0, 0))
-                    name_bg.blit(name, (name_bg_margin_x/2, name_bg_margin_x/2))
+                    name_bg.blit(name, (name_bg_margin_x / 2, name_bg_margin_x / 2))
                     name = name_bg
                     name_y = tile_origin_y + tiles_inner_h - name.get_rect().size[1]
 
@@ -581,12 +587,13 @@ def show_ui():
 
                 # Calculate mouseon, mouseoff, mousedrag overlays and cache them
                 if frames[index]['mouseon'] is None:
-                    mouseoff = screen.subsurface((tile_origin_x, tile_origin_y, tiles_outer_w_dyn, tiles_outer_h)).copy()
+                    mouseoff = screen.subsurface(
+                        (tile_origin_x, tile_origin_y, tiles_outer_w_dyn, tiles_outer_h)).copy()
                     lightmask = pygame.Surface((tiles_outer_w_dyn, tiles_outer_h), pygame.SRCALPHA, 32)
                     lightmask.convert_alpha()
                     lightmask_drag = lightmask.copy()
-                    lightmask.fill((255,255,255,255 * highlight_percentage / 100))
-                    lightmask_drag.fill((128,128,255,255 * highlight_percentage / 100))
+                    lightmask.fill((255, 255, 255, 255 * highlight_percentage / 100))
+                    lightmask_drag.fill((128, 128, 255, 255 * highlight_percentage / 100))
                     mouseon = mouseoff.copy()
                     mouseondrag = mouseoff.copy()
                     mouseon.blit(lightmask, (0, 0))
@@ -594,7 +601,6 @@ def show_ui():
                     frames[index]['mouseon'] = mouseon.copy()
                     frames[index]['mouseondrag'] = mouseondrag.copy()
                     frames[index]['mouseoff'] = mouseoff.copy()
-
 
     pygame.display.flip()
 
@@ -620,16 +626,16 @@ def show_ui():
     if focused_win_screenshot is not None and focused_win_size is not None and focused_win_size[1] > 0:
         ar = min(focused_win_size) / max(focused_win_size)
         factor = 1.5
-        if focused_win_size[1] > focused_win_size[0]: 
-            rh = int(tiles_inner_h/factor)
+        if focused_win_size[1] > focused_win_size[0]:
+            rh = int(tiles_inner_h / factor)
             rw = int(rh * ar)
         else:
-            rw = int(tiles_inner_w/factor)
+            rw = int(tiles_inner_w / factor)
             rh = int(rw * ar)
         del factor
 
-        rectangle = pygame.rect.Rect(screen.get_width() - rw - int(pad_w/2),
-                                     screen.get_height() - rh - int(pad_h/2),
+        rectangle = pygame.rect.Rect(screen.get_width() - rw - int(pad_w / 2),
+                                     screen.get_height() - rh - int(pad_h / 2),
                                      rw,
                                      rh)
 
@@ -650,9 +656,9 @@ def show_ui():
             alpha = int(255 * i / 100)
             f = focused_win_thumb.convert_alpha()
             f.fill((255, 255, 255, alpha), None, pygame.BLEND_RGBA_MULT)
-            lightmask.fill(YELLOW + (int(alpha/8),))
+            lightmask.fill(YELLOW + (int(alpha / 8),))
             screen.blit(lightmask, lightmask_position)
-            screen.blit(f, rectangle) 
+            screen.blit(f, rectangle)
             pygame.display.flip()
             clock.tick(FPS)
 
@@ -700,7 +706,7 @@ def show_ui():
                 if event.button == 1:
                     if rectangle_dragging:
                         move_win = True
-                    jump = True  
+                    jump = True
                     rectangle_dragging = False
                 pygame.event.clear()
                 break
@@ -772,7 +778,7 @@ def show_ui():
                 screen.blit(frames[frame]['mouseoff'], frames[frame]['ul'])
                 frames[frame]['active'] = False
                 grid_dirty_flag = True
-        if active_frame: # and not frames[active_frame]['active']:
+        if active_frame:  # and not frames[active_frame]['active']:
             screen.blit(frames[active_frame]['mouseon'], frames[active_frame]['ul'])
             grid_dirty_flag = True
             if rectangle_dragging:
@@ -805,11 +811,10 @@ def show_ui():
 
 def reset_update_timer(i3, e):
     global last_update
-    last_update = time.time()   
+    last_update = time.time()
 
 
-if __name__ == '__main__':
-
+def main():
     read_config()
     init_knowledge()
     update_state(i3, None)
@@ -821,15 +826,19 @@ if __name__ == '__main__':
     i3.on('window::fullscreen_mode', update_state)
     # i3.on('window::focus', update_state)
 
-    # Reset time counter so that the update thread does not take a screenshot 
+    # Reset time counter so that the update thread does not take a screenshot
     # while transitioning from one workspace to another, resulting in a dirty screenshot
     # if you use a compositor with fading enabled
     i3.on('workspace', reset_update_timer)
 
-    i3_thread = Thread(target = i3.main)
+    i3_thread = Thread(target=i3.main)
     i3_thread.daemon = True
     i3_thread.start()
 
     while True:
         time.sleep(1)
         update_state(i3, None)
+
+
+if __name__ == '__main__':
+    main()
