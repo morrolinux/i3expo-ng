@@ -1,4 +1,4 @@
-# Overwiew
+# Overview
 
 Expo is a simple and straightforward way to get a visual impression of all your
 current virtual desktops that many compositing window managers use.  It's not a
