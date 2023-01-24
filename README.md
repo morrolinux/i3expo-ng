@@ -80,6 +80,12 @@ make install
 pacman -S libx11 python-pip make gcc xorg-xrandr
 make install
 ```
+### Install in Slackware Linux with sbopkg
+
+```
+sqg -p i3expo-ng
+sbopkg -i i3expo-ng
+```
 
 ### Manual compile python extension
 
