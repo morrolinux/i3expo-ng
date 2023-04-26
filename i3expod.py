@@ -18,7 +18,7 @@ from threading import Thread
 import prtscn
 
 try:
-    from xdg import xdg_config_home
+    from xdg_base_dirs import xdg_config_home
 
     xdg_config_home = str(xdg_config_home())
 except ImportError:
