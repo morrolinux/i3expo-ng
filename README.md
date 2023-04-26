@@ -40,7 +40,7 @@ Example output:
 - PyGame
 - i3ipc
 - pillow
-- xdg
+- xdg-base-dirs
 - pyxdg
 # Usage
 

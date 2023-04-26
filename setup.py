@@ -20,7 +20,7 @@ setup(
         'pygame',
         'i3ipc',
         'pillow',
-        'xdg',
+        'xdg-base-dirs',
         'pyxdg',
     ],
     entry_points={
